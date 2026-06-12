@@ -1,0 +1,100 @@
+# Filtro de preço por Qualidade/Estado da carta (M/NM/SP/MP/HP/D)
+
+## Contexto
+
+Hoje a extensão usa só o preço agregado da Liga (`cards_editions` → p/m/g), que mistura todas as condições — o "menor preço" pode ser de uma carta Danificada. O usuário quer selecionar no popup quais qualidades/estados considerar (como o filtro da própria Liga), e o badge mostrar o menor preço só entre listagens dessas condições.
+
+**Nota de terminologia**: na Liga, "Qualidade" e "Estado da carta" são a MESMA escala (modal do site: "Qualidade / Estado da carta"): 1=M (Nova), 2=NM, 3=SP, 4=MP, 5=HP, 6=D. Um único filtro de checkboxes cobre o pedido.
+
+## Descobertas de recon (verificadas ao vivo, 2026-06-12)
+
+1. **`var cards_stock = [...]`** inline na página da carta: TODAS as listagens individuais de lojas (~290 p/ Elvish Mystic). Campos: `{id, idEdicao, num, qualid "1".."6", idioma, extras (0 ou id ex. 2=Foil), lj_uf, sellType, precoCss, ...}`. `idEdicao` casa com `cards_editions[].id`; `num` = collector number → dá pra filtrar a impressão exata.
+2. Também inline: `dataQuality` (1=M..6=D), `dataExtras` (2=Foil, 31=Foil Etched...), `dataLanguage`.
+3. **Preço ofuscado**: `precoCss` = grupos separados por `;`, cada grupo = 1 caractere. Grupo literal `V` = vírgula (`P` = ponto de milhar, a confirmar). Grupo de dígito = classes CSS: imagem (sprite), tamanho (7x15), posição (`background-position`). Regras CSS inline no próprio HTML.
+4. **Sprite**: PNG 600x84, grade de glifos 7x15 em x=8k, y=2+21·linha (75 col × 4 lin). Host `repositorio.sbrauble.com` — sem Cloudflare, fetch direto OK.
+5. **Glifos estáveis**: bitmaps binarizados (lum<160) de 2 sprites diferentes: 295/300 células com match EXATO de string. Pool fixo de ~100 padrões (0-9, vírgula, branco) → dicionário hardcoded padrão→char funciona; fallback Hamming ≤10 bits.
+6. Cloudflare deixou passar até `curl` desta máquina hoje — calibração pode baixar páginas direto (fallback: salvar HTML pelo navegador).
+7. `manifest.json` precisa de host_permission para `repositorio.sbrauble.com`.
+
+## Design
+
+Dois caminhos no worker:
+- **Todas qualidades marcadas (default)**: caminho atual intacto (preço agregado p/m/g). Zero custo de OCR.
+- **Subconjunto marcado**: preço = listagens decodificadas de `cards_stock` filtradas por edição exata (`idEdicao` + `num`), foil via `extras`, `qualid ∈ seleção`. `p`=min, `m`=média, `g`=max das listagens filtradas.
+
+Decodificação (OCR do sprite) acontece **1x no fetch**; cache guarda preços já em claro. Mudar filtro no popup NÃO refaz fetch — `getPrice` só re-filtra o cache.
+
+## Fase 0 — Calibração (1x, antes do decoder)
+
+Gerar `src/background/glyphdict.js` (padrão 105 chars → caractere):
+1. `tools/calibrate.ps1` (PowerShell 5.1 + System.Drawing): baixa 2-3 páginas da Liga (curl/IWR; fallback Ctrl+S no navegador → `tools/samples/`), extrai URLs de sprite do CSS inline, baixa sprites.
+2. Para cada sprite: células 7x15 em (8·col, 2+21·lin), binariza `lum = 0.299r+0.587g+0.114b < 160`, string 105 chars row-major. **Mesma fórmula copiada bit a bit pro decoder runtime.**
+3. Dedup → contact sheet `tools/glyph-contact-sheet.png` (padrões ampliados 10x + índice) → rotular via vision (Read) → `tools/labels.txt` → `calibrate.ps1 -EmitDict` gera `glyphdict.js` (~100 entradas, ~11KB).
+4. Sanidade: decodificar preços de uma página salva e conferir com a página no navegador.
+
+## Fase 1 — Decoder + fetch
+
+**Novo `src/background/pricedecode.js`**:
+- `decodeStockFromHtml(html)` → `[{e: idEdicao, n: num, q: qualid, x: extras, l: idioma, p: preço}] | null` (falha → null, nunca lança).
+- Internos: `parseStock` (regex `var cards_stock`), `parseCssMaps` (classe→background-image / classe→background-position), `fetchSprites` (createImageBitmap + OffscreenCanvas + getImageData; cache em memória por URL), `cellPattern` (col = -x/8, lin = (-y-2)/21), `matchGlyph` (dict exato → Hamming ≤10 → null), `decodePrice` (split `;`, `V`→vírgula, `P`→descartado; char null → linha descartada). `getFoilExtraIds(html)` parseia `dataExtras` (`/foil/i`, fallback `[2,31]`).
+- **Self-check**: min decodificado não-foil global ≈ min `price.p` de `cards_editions` (tolerância 1%/R$0,05). Falhou → warn + retorna null (degrada pro agregado se a Liga trocar o pool de glifos).
+- Normalizar `qualid`/`extras`/`idEdicao` com `Number()`. Inspecionar `sellType` na 1ª página real (filtrar buylist se existir).
+
+**`src/background/ligamagic.js`**:
+- Refatorar cascata para retornar o `html` vencedor; novo `fetchLigaData(...)` → `{editions, stock, foilIds}`.
+- Novo `findStockPrice(stock, editions, editionCode, collectorNumber, foil, qualSet, priceType, foilIds)`: reusa tiers do `findEditionPrice` p/ resolver editionId, filtra stock (edição → num via `normNum` se >1 impressão → foil → qualidade), retorna `{value, approximate, editionId} | null`.
+- `findEditionPrice`/`extractPrice` intactos.
+
+**`manifest.json`**: + `"https://repositorio.sbrauble.com/*"` em host_permissions; + `unlimitedStorage` (stock decodificado ~10-15KB/carta); bump v1.4.0.
+
+## Fase 2 — Worker: cache v2 + filtro
+
+- Cache (prefixo `liga_` mantido): valor vira `{v:2, editions, stock|null, foilIds}`. Entrada antiga (array puro) = miss → refetch 1x (TTL 24h auto-migra). `NOT_FOUND` intacto.
+- `getPrice`: lê `qualityFilter` do storage; `isFiltering = 0 < len < 6`. Se filtrando e `stock` existe → `findStockPrice`; sem listagem na condição → **fallback agregado com `~`** + `conditionFallback: true` (total do deck precisa de número; "—" deixaria total enganoso).
+- `fetchWithDedupe`/throttle/retry intactos, só passam a cachear o objeto v2.
+
+## Fase 3 — Popup
+
+- `popup.html`: linha "Qualidade" com 6 checkboxes (M NM SP MP HP D, tooltips PT, todas marcadas default) + CSS compacto.
+- `popup.js`: carrega/salva `qualityFilter` (array de ints); change → set + `{type:'refresh'}` + flash. Seleção vazia = todas (worker já trata; flash avisa).
+- Refresh é barato: re-filtra cache, sem rede.
+
+## Fase 4 — Content script
+
+- `archidekt.js`: tooltip do badge quando `conditionFallback` ("Sem estoque na condição selecionada — preço geral aproximado"). Resto intacto (fluxo `refresh` já re-renderiza).
+
+## Edge cases
+
+| Caso | Tratamento |
+|---|---|
+| Sem `cards_stock` / decode falhou / self-check falhou | `stock: null` → fallback agregado silencioso |
+| Impressão só foil (ou vice-versa) | filtro vazio → fallback agregado |
+| Pool de glifos rotacionado pela Liga | Hamming + self-check → degrada pro agregado |
+| Cache antigo (array) | tratado como miss, refetch 1x |
+| Zeros à esquerda em `num` | reusar `normNum` |
+| Separador de milhar `P` | a confirmar na implementação (carta cara, ex. Black Lotus); self-check pega se errado |
+
+## Verificação manual
+
+1. Calibração: `glyphdict.js` com ~95-105 entradas cobrindo 0-9.
+2. Reload unpacked → limpar cache → deck Archidekt com tudo marcado → badges idênticos à v1.3 (regressão), sem warns no console do SW.
+3. Marcar só NM → badges atualizam SEM refetch (conferir network do SW); cada preço filtrado ≥ menor geral.
+4. Spot-check: abrir página da Liga de 1 carta, filtrar manualmente edição+NM+não-foil, conferir min com badge.
+5. Carta foil → preço vem de listagens foil.
+6. Carta sem estoque NM na impressão → `~` + tooltip de fallback.
+7. Menor/Médio/Maior com filtro → min/média/max mudam.
+8. Limpar cache → refetch completo com decode, timing OK (~1 sprite/carta, host paralelo).
+9. Atualizar `.claude/memory.md` (v1.4: cards_stock, decode de sprite, filtro de qualidade).
+
+## Sequência
+
+0. Calibração → 1. `pricedecode.js` + manifest + `ligamagic.js` → 2. `worker.js` cache v2 → 3. Popup → 4. Tooltip + verificação + memory.md
+
+## Arquivos
+
+- `src/background/pricedecode.js` (novo) + `src/background/glyphdict.js` (gerado)
+- `tools/calibrate.ps1` (novo, ferramenta de build)
+- `src/background/ligamagic.js`, `src/background/worker.js`
+- `popup/popup.html`, `popup/popup.js`
+- `src/content/archidekt.js` (tooltip)
+- `manifest.json`

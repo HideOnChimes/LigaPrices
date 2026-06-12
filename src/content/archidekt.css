@@ -1,0 +1,119 @@
+/* Badge de preço por carta — estilo flat nativo do Archidekt */
+.liga-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 2px;
+  background: transparent;
+  color: var(--color);
+  font-size: inherit;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.liga-badge:hover {
+  opacity: 0.6;
+  color: var(--archidekt-orange);
+  text-decoration: none;
+}
+
+.liga-badge__logo {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.liga-badge__price {
+  line-height: 1;
+}
+
+.liga-badge--loading .liga-badge__price {
+  opacity: 0.45;
+}
+
+.liga-badge--error {
+  opacity: 0.4;
+}
+
+.liga-badge--approx .liga-badge__price {
+  color: #ffd770;
+}
+
+/* Linha LigaMagic no modal/painel de detalhes da carta */
+.liga-detail-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2px 0 0;
+  background: transparent;
+  border: none;
+  color: var(--color);
+  font-size: inherit;
+  font-weight: 700;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+
+.liga-detail-row:hover {
+  opacity: 0.6;
+  color: var(--archidekt-orange);
+  text-decoration: none;
+}
+
+.liga-detail-row__logo {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.liga-detail-row__label {
+  display: none;
+}
+
+.liga-detail-row__price {
+  line-height: 1;
+}
+
+/* Total do deck inline junto ao Est. cost */
+.liga-total-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 10px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  cursor: default;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.liga-total-badge__logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.liga-total-badge__price {
+  /* cor sobrescrita via style.color inline — herda fonte da classe nativa */
+}

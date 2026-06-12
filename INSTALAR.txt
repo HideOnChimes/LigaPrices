@@ -1,0 +1,29 @@
+== COMO INSTALAR ==
+
+1. Abra o Chrome e acesse: chrome://extensions
+2. Ative o "Modo do desenvolvedor" (canto superior direito)
+3. Clique em "Carregar sem compactação" (Load unpacked)
+4. Selecione a pasta: archidekt-ligamagic-extension
+5. A extensão aparecerá na lista com o ícone verde "L"
+
+== COMO USAR ==
+
+1. Acesse qualquer deck no Archidekt: https://archidekt.com/decks/...
+2. Os preços em R$ da LigaMagic aparecem automaticamente ao lado dos preços em $ de cada carta
+3. O total do deck em R$ aparece no header do deck
+4. Preços com "~" são aproximados (edição/arte exata não encontrada na Liga)
+5. Passe o mouse sobre o preço para ver detalhes
+
+== CONFIGURAÇÕES (POPUP) ==
+
+Clique no ícone da extensão na barra do Chrome:
+- Liga/desliga os preços sem desinstalar
+- Tipo de preço: menor (padrão), médio ou maior
+- Estatísticas do deck aberto (quantas cartas com preço, aproximadas, não encontradas)
+- Atualizar preços da página / limpar cache
+
+== NOTAS ==
+
+- Preços são cacheados por 24h para não sobrecarregar a LigaMagic
+- O matching é feito por edição + número do card = impressão exata
+- Cartas foil buscam o preço foil quando disponível

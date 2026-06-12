@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      width: 300px;
+      margin: 0;
+      padding: 14px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-size: 13px;
+    }
+    h1 {
+      font-size: 14px;
+      margin: 0 0 12px;
+      color: #7ddf7d;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    h1 img { width: 18px; height: 18px; border-radius: 3px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    select {
+      background: #2a2a2a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 12px;
+    }
+    /* Toggle switch */
+    .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: #444; border-radius: 22px; transition: 0.2s;
+    }
+    .slider:before {
+      content: ""; position: absolute; height: 16px; width: 16px;
+      left: 3px; bottom: 3px; background: #ccc; border-radius: 50%; transition: 0.2s;
+    }
+    input:checked + .slider { background: #2a7a2a; }
+    input:checked + .slider:before { transform: translateX(18px); background: #7ddf7d; }
+
+    .quality-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .quality-boxes { display: flex; gap: 4px; width: 100%; }
+    .quality-boxes label {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 3px 0;
+      font-size: 11px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .quality-boxes label:has(input:checked) {
+      background: #2a5a2a;
+      border-color: #3a7a3a;
+      color: #7ddf7d;
+    }
+    .quality-boxes input { display: none; }
+
+    .state-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .state-header {
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .state-actions { display: flex; gap: 4px; }
+    .btn-mini {
+      padding: 2px 7px;
+      font-size: 10px;
+      width: auto;
+      margin: 0;
+      background: #2a2a2a;
+      color: #aaa;
+      border: 1px solid #444;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .btn-mini:hover { background: #3a3a3a; color: #e0e0e0; }
+    .state-boxes {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 3px;
+      width: 100%;
+    }
+    .state-boxes label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 3px 0;
+      font-size: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .state-boxes label:has(input:checked) {
+      background: #2a5a2a;
+      border-color: #3a7a3a;
+      color: #7ddf7d;
+    }
+    .state-boxes input { display: none; }
+
+    .stats {
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .stats .ok { color: #7ddf7d; }
+    .stats .approx { color: #ffd770; }
+    .stats .miss { color: #df7d7d; }
+    .notfound-list {
+      max-height: 90px;
+      overflow-y: auto;
+      margin-top: 4px;
+      padding-left: 16px;
+      color: #aaa;
+      font-size: 11px;
+    }
+    button {
+      width: 100%;
+      padding: 6px;
+      margin-top: 4px;
+      background: #2a2a2a;
+      color: #ccc;
+      border: 1px solid #444;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    button:hover { background: #3a3a3a; }
+    button.primary { background: #2a5a2a; color: #7ddf7d; border-color: #3a7a3a; }
+    button.primary:hover { background: #3a7a3a; }
+    .status { font-size: 11px; color: #888; text-align: center; margin-top: 6px; min-height: 14px; }
+    a.liga-link { color: #7ddf7d; font-size: 11px; display: block; text-align: center; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1><img src="../assets/icons/ligamagic-logo.png" alt=""> LigaMagic Prices</h1>
+
+  <div class="row">
+    <span>Mostrar preços</span>
+    <label class="switch">
+      <input type="checkbox" id="enabled">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="row">
+    <span>Tipo de preço</span>
+    <select id="priceType">
+      <option value="p">Menor</option>
+      <option value="m">Médio</option>
+      <option value="g">Maior</option>
+    </select>
+  </div>
+
+  <div class="row quality-row">
+    <span>Qualidade / Estado da carta</span>
+    <div class="quality-boxes" id="qualityBoxes">
+      <label title="Nova (M)"><input type="checkbox" data-q="1" checked>M</label>
+      <label title="Praticamente Nova (NM)"><input type="checkbox" data-q="2" checked>NM</label>
+      <label title="Usada Levemente (SP)"><input type="checkbox" data-q="3" checked>SP</label>
+      <label title="Usada Moderadamente (MP)"><input type="checkbox" data-q="4" checked>MP</label>
+      <label title="Muito Usada (HP)"><input type="checkbox" data-q="5" checked>HP</label>
+      <label title="Danificada (D)"><input type="checkbox" data-q="6" checked>D</label>
+    </div>
+  </div>
+
+  <div class="row state-row">
+    <div class="state-header">
+      <span>Estado das lojas</span>
+      <div class="state-actions">
+        <button class="btn-mini" id="stateAll">Todos</button>
+        <button class="btn-mini" id="stateNone">Nenhum</button>
+      </div>
+    </div>
+    <div class="state-boxes" id="stateBoxes">
+      <label title="Acre"><input type="checkbox" data-uf="AC">AC</label>
+      <label title="Alagoas"><input type="checkbox" data-uf="AL">AL</label>
+      <label title="Amazonas"><input type="checkbox" data-uf="AM">AM</label>
+      <label title="Amapá"><input type="checkbox" data-uf="AP">AP</label>
+      <label title="Bahia"><input type="checkbox" data-uf="BA">BA</label>
+      <label title="Ceará"><input type="checkbox" data-uf="CE">CE</label>
+      <label title="Distrito Federal"><input type="checkbox" data-uf="DF">DF</label>
+      <label title="Espírito Santo"><input type="checkbox" data-uf="ES">ES</label>
+      <label title="Goiás"><input type="checkbox" data-uf="GO">GO</label>
+      <label title="Maranhão"><input type="checkbox" data-uf="MA">MA</label>
+      <label title="Minas Gerais"><input type="checkbox" data-uf="MG">MG</label>
+      <label title="Mato Grosso do Sul"><input type="checkbox" data-uf="MS">MS</label>
+      <label title="Mato Grosso"><input type="checkbox" data-uf="MT">MT</label>
+      <label title="Pará"><input type="checkbox" data-uf="PA">PA</label>
+      <label title="Paraíba"><input type="checkbox" data-uf="PB">PB</label>
+      <label title="Pernambuco"><input type="checkbox" data-uf="PE">PE</label>
+      <label title="Piauí"><input type="checkbox" data-uf="PI">PI</label>
+      <label title="Paraná"><input type="checkbox" data-uf="PR">PR</label>
+      <label title="Rio de Janeiro"><input type="checkbox" data-uf="RJ">RJ</label>
+      <label title="Rio Grande do Norte"><input type="checkbox" data-uf="RN">RN</label>
+      <label title="Rondônia"><input type="checkbox" data-uf="RO">RO</label>
+      <label title="Roraima"><input type="checkbox" data-uf="RR">RR</label>
+      <label title="Rio Grande do Sul"><input type="checkbox" data-uf="RS">RS</label>
+      <label title="Santa Catarina"><input type="checkbox" data-uf="SC">SC</label>
+      <label title="Sergipe"><input type="checkbox" data-uf="SE">SE</label>
+      <label title="São Paulo"><input type="checkbox" data-uf="SP">SP</label>
+      <label title="Tocantins"><input type="checkbox" data-uf="TO">TO</label>
+    </div>
+  </div>
+
+  <div class="stats" id="stats">
+    <em>Abra um deck no Archidekt para ver estatísticas.</em>
+  </div>
+
+  <button class="primary" id="refresh">Atualizar preços da página</button>
+  <button id="clearCache">Limpar cache de preços</button>
+  <div class="status" id="status"></div>
+
+  <a class="liga-link" href="https://www.ligamagic.com.br" target="_blank">Abrir LigaMagic ↗</a>
+
+  <script src="popup.js"></script>
+</body>
+</html>
