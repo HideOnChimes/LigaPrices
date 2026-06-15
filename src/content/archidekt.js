@@ -6,10 +6,14 @@ const LIGA_HOME = 'https://www.ligamagic.com.br';
 const INJECTED_ATTR = 'data-liga-price';
 
 // uid → { editionCode, collectorNumber, modifier, name, quantity, excludeFromTotal }
+// Mescla os cards de todos os decks da página (suporta /compare com 2+ decks).
 let uidMap = {};
 let enabled = true;
 let observer = null;
-let deckId = null;
+let deckIds = new Set();        // ids de deck presentes na rota atual
+let fetchedDeckIds = new Set(); // ids já buscados (evita refetch)
+let currentUrl = '';            // detecta navegação SPA do Archidekt
+let reiniting = false;          // guarda reentrância do reinit()
 let deckRefetching = false;
 let deckRefetchTimer = null;
 let renderGen = 0; // invalida resultados async obsoletos após refresh
@@ -26,19 +30,17 @@ const stats = {
 init();
 
 async function init() {
-  deckId = getDeckId();
-  if (!deckId) return;
+  currentUrl = location.href;
 
   const cfg = await chrome.storage.local.get('enabled');
   enabled = cfg.enabled !== false; // padrão ligado
 
-  try {
-    uidMap = await fetchDeckData(deckId);
-  } catch (e) {
-    console.error('[LigaMagic] Erro ao buscar deck:', e);
-    return;
-  }
+  setupListeners();  // registrados uma única vez
+  await reinit();    // inicialização específica da rota atual
+}
 
+// Listeners de longa duração: registrados uma vez, sobrevivem à navegação SPA.
+function setupListeners() {
   // Liga/desliga ao vivo via popup
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
@@ -66,17 +68,87 @@ async function init() {
     }
   });
 
-  // Observa mudanças no DOM (Archidekt é React, DOM muda dinamicamente)
-  // attributes: true captura troca de img.src quando o usuário muda a impressão
+  // Observa mudanças no DOM (Archidekt é React, DOM muda dinamicamente).
+  // attributes: true captura troca de img.src quando o usuário muda a impressão.
+  // Também detecta navegação SPA: a troca de rota re-renderiza o DOM.
   observer = new MutationObserver(onMutation);
   observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
 
-  if (enabled) processAll();
+  // Back/forward do navegador (pushState do React é pego via onMutation, pois
+  // monkeypatch de history.pushState não cruza os mundos isolados do content script).
+  window.addEventListener('popstate', onUrlChange);
 }
 
-function getDeckId() {
-  const m = location.pathname.match(/\/decks\/(\d+)/);
-  return m ? m[1] : null;
+function onUrlChange() {
+  if (location.href === currentUrl) return;
+  reinit();
+}
+
+// (Re)inicializa o estado para a rota atual. Chamado no load e a cada navegação SPA.
+async function reinit() {
+  if (reiniting) return;
+  reiniting = true;
+  try {
+    currentUrl = location.href;
+    removeAllBadges();
+    resetStats();
+    uidMap = {};
+    fetchedDeckIds = new Set();
+
+    deckIds = getDeckIds();
+    if (!deckIds.size) return; // rota sem deck (home, etc.): nada a fazer
+
+    await fetchDecks(deckIds);
+    if (enabled) processAll();
+  } catch (e) {
+    console.error('[LigaMagic] Erro no reinit:', e);
+  } finally {
+    reiniting = false;
+  }
+}
+
+// Conjunto de deck ids da rota atual.
+// /decks/{id}: um id. /compare: ids vindos da query e dos links de deck no DOM.
+function getDeckIds() {
+  const ids = new Set();
+
+  const pathMatch = location.pathname.match(/\/decks\/(\d+)/);
+  if (pathMatch) ids.add(pathMatch[1]);
+
+  // Página de comparação: decks vêm como query params (URL de deck ou id puro)
+  // e/ou como links no DOM. Restrito a /compare para não varrer listas de decks
+  // (home, perfil) onde há muitos links de deck não relacionados.
+  if (location.pathname.startsWith('/compare')) {
+    for (const value of new URLSearchParams(location.search).values()) {
+      const v = String(value);
+      const deckUrl = v.match(/\/decks\/(\d+)/);
+      if (deckUrl) { ids.add(deckUrl[1]); continue; }
+      const bare = v.match(/^(\d+)$/);
+      if (bare) ids.add(bare[1]);
+    }
+    for (const a of document.querySelectorAll('a[href*="/decks/"]')) {
+      const m = a.getAttribute('href')?.match(/\/decks\/(\d+)/);
+      if (m) ids.add(m[1]);
+    }
+  }
+
+  return ids;
+}
+
+// Busca cada deck ainda não buscado e mescla no uidMap global.
+// UID do Scryfall é único por impressão, então o merge entre decks é seguro.
+async function fetchDecks(ids) {
+  for (const id of ids) {
+    if (fetchedDeckIds.has(id)) continue;
+    fetchedDeckIds.add(id);
+    try {
+      const map = await fetchDeckData(id);
+      Object.assign(uidMap, map);
+    } catch (e) {
+      fetchedDeckIds.delete(id); // permite retry futuro
+      console.error('[LigaMagic] Erro ao buscar deck', id, e);
+    }
+  }
 }
 
 async function fetchDeckData(deckId) {
@@ -117,6 +189,8 @@ function resetStats() {
 }
 
 function onMutation(mutations) {
+  // Navegação SPA do Archidekt re-renderiza o DOM: detecta a troca de rota aqui.
+  if (location.href !== currentUrl) { onUrlChange(); return; }
   if (!enabled) return;
   let hasNew = false;
   for (const m of mutations) {
@@ -157,10 +231,16 @@ function scheduleRefetch() {
   if (deckRefetching) return;
   clearTimeout(deckRefetchTimer);
   deckRefetchTimer = setTimeout(async () => {
-    if (!deckId) return;
     deckRefetching = true;
     try {
-      uidMap = await fetchDeckData(deckId);
+      const ids = getDeckIds();
+      if (!ids.size) return; // rota sem deck: nada a buscar
+      // Deck novo apareceu na página (ex.: /compare carregou o 2º deck) → busca.
+      // Senão, troca de printing adicionou um uid: re-busca os decks atuais.
+      const hasNewDeck = [...ids].some(id => !fetchedDeckIds.has(id));
+      if (!hasNewDeck) fetchedDeckIds = new Set();
+      deckIds = ids;
+      await fetchDecks(ids);
       processAll(); // reprocessa pendentes agora que uidMap está atualizado
     } catch (e) {
       console.error('[LigaMagic] Erro ao refetch deck:', e);
