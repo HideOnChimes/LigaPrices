@@ -5,9 +5,18 @@ const LIGA_LOGO_URL = chrome.runtime.getURL('assets/icons/ligamagic-logo.png');
 const LIGA_HOME = 'https://www.ligamagic.com.br';
 const INJECTED_ATTR = 'data-liga-price';
 
-// uid → { editionCode, collectorNumber, modifier, name, quantity, excludeFromTotal }
+// Terras básicas (EN) — usadas para o cálculo "Excluding basic lands" no popup do Est. cost
+const BASIC_LANDS = new Set([
+  'Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes',
+  'Snow-Covered Plains', 'Snow-Covered Island', 'Snow-Covered Swamp',
+  'Snow-Covered Mountain', 'Snow-Covered Forest',
+]);
+
+// uid → { editionCode, collectorNumber, modifier, name, quantity, excludeFromTotal, isBasicLand }
 // Mescla os cards de todos os decks da página (suporta /compare com 2+ decks).
 let uidMap = {};
+// uid → { value, approximate } — preço resolvido por carta, autoritativo p/ soma por categoria.
+let priceByUid = {};
 let enabled = true;
 let observer = null;
 let deckIds = new Set();        // ids de deck presentes na rota atual
@@ -195,6 +204,7 @@ async function fetchDeckData(deckId) {
       modifier: entry.modifier || 'Normal',
       quantity: entry.quantity || 1,
       excludeFromTotal: primaryCategory != null && excludedCategories.has(primaryCategory),
+      isBasicLand: BASIC_LANDS.has(entry.card?.oracleCard?.name || ''),
     };
   }
   return map;
@@ -223,9 +233,13 @@ function onMutation(mutations) {
   let hasNew = false;
   for (const m of mutations) {
     for (const node of m.addedNodes) {
-      if (node.nodeType === 1) { hasNew = true; break; }
+      if (node.nodeType !== 1) continue;
+      hasNew = true;
+      // Popup do Est. cost montado: injeta R$ ao lado de "Excluding basic lands"
+      if (node.textContent && node.textContent.includes(POPUP_MARKER)) {
+        try { injectPopupBRL(node); } catch (e) { console.warn('[LigaMagic] injectPopupBRL:', e); }
+      }
     }
-    if (hasNew) break;
   }
   if (hasNew) {
     clearTimeout(window._ligaDebounce);
@@ -242,18 +256,22 @@ function processAll() {
   try { processPrintingSelector(); } catch (e) { console.warn('[LigaMagic] processPrintingSelector:', e); }
   try { processDetailViews(); } catch (e) { console.warn('[LigaMagic] processDetailViews:', e); }
   try { updateDeckTotal(); } catch (e) { console.warn('[LigaMagic] updateDeckTotal:', e); }
+  try { injectCategoryTotals(); } catch (e) { console.warn('[LigaMagic] injectCategoryTotals:', e); }
 }
 
 function removeAllBadges() {
   renderGen++;
-  document.querySelectorAll('.liga-badge, .liga-total-badge, .liga-detail-row, .liga-print-price').forEach(el => el.remove());
+  priceByUid = {};
+  document.querySelectorAll('.liga-badge, .liga-total-badge, .liga-detail-row, .liga-print-price, .liga-cat-brl').forEach(el => el.remove());
   document.querySelectorAll(`[${INJECTED_ATTR}]`).forEach(el => el.removeAttribute(INJECTED_ATTR));
+  document.querySelectorAll('[data-liga-cat-brl]').forEach(el => el.removeAttribute('data-liga-cat-brl'));
   document.querySelectorAll('[data-liga-seen]').forEach(el => el.removeAttribute('data-liga-seen'));
   document.querySelectorAll('[data-liga-print-seen]').forEach(el => el.removeAttribute('data-liga-print-seen'));
   document.querySelectorAll('[data-liga-uid]').forEach(el => {
     delete el._ligaPrice;
     delete el._ligaQty;
     delete el._ligaExclude;
+    delete el._ligaBasic;
     el.removeAttribute('data-liga-uid');
   });
 }
@@ -358,6 +376,8 @@ async function processCardWrapper(wrapper) {
     wrapper._ligaPrice = result.value;
     wrapper._ligaQty = cardData.quantity;
     wrapper._ligaExclude = cardData.excludeFromTotal || false;
+    wrapper._ligaBasic = cardData.isBasicLand || false;
+    priceByUid[uid] = { value: result.value, approximate: !!result.approximate };
     stats.pricedUids.add(uid);
     if (result.approximate) stats.approximateUids.add(uid);
     if (result.conditionFallback) {
@@ -763,26 +783,51 @@ function formatBRL(value) {
 
 // ===== Total do deck =====
 
-function updateDeckTotal() {
-  const done = document.querySelectorAll(`[class*="deckCardWrapper_container"][${INJECTED_ATTR}="done"]`);
-  let total = 0;
-  let hasApprox = false;
+// Soma os preços do deck. total = todas as cartas; exclBasics = sem terras básicas.
+// missing = há cartas aproximadas ou ainda sem preço (total parcial).
+// Copia a fonte resolvida de `src` para `el` — garante match mesmo quando as regras
+// de fonte vivem numa classe pai (copiar só a className não basta).
+function copyFont(el, src) {
+  const cs = getComputedStyle(src);
+  el.style.fontFamily = cs.fontFamily;
+  el.style.fontSize = cs.fontSize;
+  el.style.fontWeight = cs.fontWeight;
+  el.style.fontStyle = cs.fontStyle;
+  el.style.letterSpacing = cs.letterSpacing;
+  el.style.lineHeight = cs.lineHeight;
+}
 
-  for (const w of done) {
+// Soma um conjunto de wrappers de carta. Retorna { total, exclBasics, missing }.
+// missing = true se algum tem preço aproximado ou ainda não precificado.
+function sumWrappers(wrappers) {
+  let total = 0;
+  let exclBasics = 0;
+  let missing = false;
+
+  for (const w of wrappers) {
     if (w._ligaExclude) continue;
-    if (w._ligaPrice != null) {
-      total += w._ligaPrice * (w._ligaQty || 1);
+    const state = w.getAttribute(INJECTED_ATTR);
+    if (state === 'done' && w._ligaPrice != null) {
+      const sub = w._ligaPrice * (w._ligaQty || 1);
+      total += sub;
+      if (!w._ligaBasic) exclBasics += sub;
+      if (w.querySelector('.liga-badge--approx')) missing = true;
+    } else if (state && state !== 'done') {
+      missing = true; // error/noprice/transient/loading
     }
-    if (w.querySelector('.liga-badge--approx')) hasApprox = true;
   }
 
-  const incomplete = document.querySelectorAll(
-    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="error"],` +
-    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="noprice"],` +
-    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="transient"],` +
-    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="loading"]`
-  ).length;
-  const missing = incomplete > 0 || hasApprox;
+  return { total, exclBasics, missing };
+}
+
+function computeTotals() {
+  return sumWrappers(
+    document.querySelectorAll(`[class*="deckCardWrapper_container"][${INJECTED_ATTR}]`)
+  );
+}
+
+function updateDeckTotal() {
+  const { total, missing } = computeTotals();
 
   let totalEl = document.getElementById('liga-total-badge');
   if (!totalEl) {
@@ -799,8 +844,9 @@ function updateDeckTotal() {
     logoImg.className = 'liga-total-badge__logo';
 
     const priceSpan = document.createElement('span');
-    // Herda a classe nativa do Archidekt (font, tamanho, etc.) e sobrepõe a cor
-    priceSpan.className = deckPriceEl.className + ' liga-total-badge__price';
+    // Copia a fonte resolvida da Liga (regras podem estar numa classe pai) e sobrepõe a cor
+    priceSpan.className = 'liga-total-badge__price';
+    copyFont(priceSpan, deckPriceEl);
     priceSpan.style.color = '#7ddf7d';
 
     totalEl.appendChild(logoImg);
@@ -813,4 +859,96 @@ function updateDeckTotal() {
   totalEl.title = missing
     ? 'Total aproximado (algumas cartas sem preço exato)'
     : 'Total do deck em R$ na LigaMagic';
+}
+
+// ===== Total por categoria =====
+// Na visão agrupada do Archidekt cada seção (Commander, Counters, ...) tem um cabeçalho
+// com "Price: $X". Injeta o total R$ daquela categoria colado ao lado. Agrupa por ORDEM de
+// documento: o cabeçalho precede suas cartas, então cada wrapper pertence ao cabeçalho
+// anterior mais próximo. Soma = priceByUid (preço) × uidMap.quantity (qtd). Robusto a layout
+// e a cartas multi-categoria (agrupa pelo que está REALMENTE sob o cabeçalho).
+const CAT_PRICE_RE = /Price:\s*\$\s*[\d]/;
+
+function injectCategoryTotals() {
+  // Uma varredura em ordem de documento coleta cabeçalhos "Price: $X" e os wrappers de
+  // carta mais internos. Aninhamento (ex.: <span>Price: <span>$74</span></span>) e folha
+  // pura cobertos pela regra do "elemento mais justo".
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(el) {
+      if (el.matches('[class*="deckCardWrapper_container"]')) {
+        return el.querySelector('[class*="deckCardWrapper_container"]')
+          ? NodeFilter.FILTER_SKIP : NodeFilter.FILTER_ACCEPT; // só o mais interno
+      }
+      if (!CAT_PRICE_RE.test(el.textContent)) return NodeFilter.FILTER_SKIP;
+      for (const c of el.children) {
+        if (CAT_PRICE_RE.test(c.textContent)) return NodeFilter.FILTER_SKIP; // filho mais justo cuida
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  const sections = []; // { label, total, missing }
+  let cur = null;
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.matches('[class*="deckCardWrapper_container"]')) {
+      if (!cur) continue; // carta antes de qualquer cabeçalho (visão não agrupada)
+      const uid = n.dataset.ligaUid;
+      const c = uid ? uidMap[uid] : null;
+      if (c && c.excludeFromTotal) continue;
+      const p = uid ? priceByUid[uid] : null;
+      if (p) {
+        cur.total += p.value * (c?.quantity || 1);
+        if (p.approximate) cur.missing = true;
+      } else {
+        cur.missing = true; // ainda sem preço
+      }
+    } else {
+      cur = { label: n, total: 0, missing: false };
+      sections.push(cur);
+    }
+  }
+
+  for (const { label, total, missing } of sections) {
+    // Injeta COLADO dentro do elemento "Price: $X" (não cria item flex à parte).
+    // Cria o span uma vez; nas próximas passagens só atualiza o texto.
+    let span = label.querySelector(':scope > .liga-cat-brl');
+    if (!span) {
+      span = document.createElement('span');
+      span.className = 'liga-cat-brl';
+      copyFont(span, label);
+      span.style.color = '#7ddf7d';
+      label.appendChild(span);
+    }
+    span.textContent = (missing ? '~' : '') + formatBRL(total);
+  }
+}
+
+// ===== Popup do Est. cost do Archidekt =====
+// O Archidekt renderiza um popup no hover do "Est cost" com o detalhamento
+// (Excluding basic lands, etc.). Classes são ofuscadas (CSS modules) e o popup é
+// remontado a cada hover, então detectamos pela marca de texto "Excluding basic lands"
+// e injetamos o valor em R$ ao lado dessa linha.
+const POPUP_MARKER = 'Excluding basic lands';
+
+function injectPopupBRL(root) {
+  // Acha a folha cujo texto começa com o marcador (a própria linha "Excluding basic lands: $X").
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(el) {
+      if (el.children.length) return NodeFilter.FILTER_SKIP; // só folhas de texto
+      return el.textContent.trim().startsWith(POPUP_MARKER)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP;
+    },
+  });
+
+  const line = walker.nextNode();
+  if (!line) return;
+  if (line.querySelector?.('.liga-popup-brl')) return; // já injetado
+  if (line.parentElement?.querySelector('.liga-popup-brl')) return;
+
+  const { exclBasics, missing } = computeTotals();
+  const span = document.createElement('span');
+  span.className = 'liga-popup-brl';
+  span.textContent = ' · ' + (missing ? '~' : '') + formatBRL(exclBasics);
+  line.appendChild(span);
 }

@@ -118,6 +118,20 @@
   /* cor sobrescrita via style.color inline — herda fonte da classe nativa */
 }
 
+/* Valor em R$ injetado no popup do Est. cost (linha "Excluding basic lands") */
+.liga-popup-brl {
+  color: #7ddf7d;
+  font-weight: inherit;
+  white-space: nowrap;
+}
+
+/* Total em R$ por categoria, ao lado do "Price: $X" do cabeçalho da seção */
+.liga-cat-brl {
+  color: #7ddf7d;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
 /* Preço LigaMagic em cada impressão do seletor de printing */
 .liga-print-price {
   display: inline-flex;
