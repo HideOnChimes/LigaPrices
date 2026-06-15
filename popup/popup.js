@@ -145,6 +145,18 @@ function renderStats(s) {
         : '';
     html += `<div><span class="approx">⚠ ${s.filterFallback}</span> sem estoque no filtro${reasonLabel} — preço agregado</div>`;
   }
+  if (s.noPrice && s.noPrice.length > 0) {
+    html += `<div><span class="approx">● ${s.noPrice.length}</span> sem preço cadastrado:</div>`;
+    html += `<ul class="notfound-list">` +
+      s.noPrice.map(n => `<li>${escapeHtml(n)}</li>`).join('') +
+      `</ul>`;
+  }
+  if (s.transient && s.transient.length > 0) {
+    html += `<div><span class="approx">↻ ${s.transient.length}</span> com falha temporária — reabra para tentar de novo:</div>`;
+    html += `<ul class="notfound-list">` +
+      s.transient.map(n => `<li>${escapeHtml(n)}</li>`).join('') +
+      `</ul>`;
+  }
   if (s.notFound && s.notFound.length > 0) {
     html += `<div><span class="miss">✘ ${s.notFound.length}</span> não encontradas:</div>`;
     html += `<ul class="notfound-list">` +

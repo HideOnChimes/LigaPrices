@@ -14,17 +14,20 @@ let deckIds = new Set();        // ids de deck presentes na rota atual
 let fetchedDeckIds = new Set(); // ids já buscados (evita refetch)
 let currentUrl = '';            // detecta navegação SPA do Archidekt
 let reiniting = false;          // guarda reentrância do reinit()
+let pendingReinit = false;      // URL mudou enquanto reinit estava em curso
 let deckRefetching = false;
 let deckRefetchTimer = null;
 let renderGen = 0; // invalida resultados async obsoletos após refresh
 
-// Estatísticas para o popup
+// Estatísticas para o popup. Contagens por uid (Set) para não inflar em re-render do React.
 const stats = {
-  priced: 0,
-  approximate: 0,
-  notFound: [],          // nomes de cartas não encontradas
-  filterFallback: 0,     // cartas que caíram no fallback do filtro
-  filterFallbackReasons: {}, // motivo → contagem
+  pricedUids: new Set(),       // uids precificados
+  approximateUids: new Set(),  // uids com preço aproximado
+  filterFallbackUids: new Set(),
+  filterFallbackReasons: {},   // motivo → contagem
+  notFound: [],   // nomes: página não encontrada
+  noPrice: [],    // nomes: página existe, sem preço cadastrado
+  transient: [],  // nomes: falha temporária (rate-limit/rede) — reabrir tenta de novo
 };
 
 init();
@@ -55,7 +58,13 @@ function setupListeners() {
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg.type === 'getStats') {
       sendResponse({
-        ...stats,
+        priced: stats.pricedUids.size,
+        approximate: stats.approximateUids.size,
+        filterFallback: stats.filterFallbackUids.size,
+        filterFallbackReasons: stats.filterFallbackReasons,
+        notFound: stats.notFound,
+        noPrice: stats.noPrice,
+        transient: stats.transient,
         total: Object.keys(uidMap).length,
         enabled,
       });
@@ -81,13 +90,22 @@ function setupListeners() {
 
 function onUrlChange() {
   if (location.href === currentUrl) return;
+  // Invalida imediatamente todos os callbacks assíncronos em voo (badges, detail rows).
+  // Sem isso, se reinit() retornar cedo (reiniting=true), renderGen não sobe e
+  // callbacks pendentes ainda injetam no DOM da nova rota (ex.: My Decks).
+  renderGen++;
   reinit();
 }
 
 // (Re)inicializa o estado para a rota atual. Chamado no load e a cada navegação SPA.
 async function reinit() {
-  if (reiniting) return;
+  if (reiniting) {
+    // Outra reinit em curso; sinaliza para rodar de novo após ela terminar.
+    pendingReinit = true;
+    return;
+  }
   reiniting = true;
+  pendingReinit = false;
   try {
     currentUrl = location.href;
     removeAllBadges();
@@ -104,6 +122,8 @@ async function reinit() {
     console.error('[LigaMagic] Erro no reinit:', e);
   } finally {
     reiniting = false;
+    // Se URL mudou enquanto estávamos em curso, processa a nova rota.
+    if (pendingReinit) reinit();
   }
 }
 
@@ -181,17 +201,25 @@ async function fetchDeckData(deckId) {
 }
 
 function resetStats() {
-  stats.priced = 0;
-  stats.approximate = 0;
-  stats.notFound = [];
-  stats.filterFallback = 0;
+  stats.pricedUids.clear();
+  stats.approximateUids.clear();
+  stats.filterFallbackUids.clear();
   stats.filterFallbackReasons = {};
+  stats.notFound = [];
+  stats.noPrice = [];
+  stats.transient = [];
+}
+
+// Só atua em rotas de deck (/decks/{id} ou /compare). Em listas (My Decks), home e perfil
+// os seletores de injeção podem casar nos tiles e quebrar o React na reconciliação.
+function isDeckRoute() {
+  return /\/decks\/\d+/.test(location.pathname) || location.pathname.startsWith('/compare');
 }
 
 function onMutation(mutations) {
   // Navegação SPA do Archidekt re-renderiza o DOM: detecta a troca de rota aqui.
   if (location.href !== currentUrl) { onUrlChange(); return; }
-  if (!enabled) return;
+  if (!enabled || !isDeckRoute()) return;
   let hasNew = false;
   for (const m of mutations) {
     for (const node of m.addedNodes) {
@@ -206,17 +234,22 @@ function onMutation(mutations) {
 }
 
 function processAll() {
-  if (!enabled) return;
-  processGridCards();
-  processDetailViews();
-  updateDeckTotal();
+  if (!enabled || !isDeckRoute()) return;
+  // Isola cada etapa: injeção em DOM gerido pelo React pode lançar; não deixa propagar.
+  try { processGridCards(); } catch (e) { console.warn('[LigaMagic] processGridCards:', e); }
+  // Antes de processDetailViews: marca entradas do seletor com data-liga-print-seen
+  // para que processDetailViews não injete detail-row duplicado nelas.
+  try { processPrintingSelector(); } catch (e) { console.warn('[LigaMagic] processPrintingSelector:', e); }
+  try { processDetailViews(); } catch (e) { console.warn('[LigaMagic] processDetailViews:', e); }
+  try { updateDeckTotal(); } catch (e) { console.warn('[LigaMagic] updateDeckTotal:', e); }
 }
 
 function removeAllBadges() {
   renderGen++;
-  document.querySelectorAll('.liga-badge, .liga-total-badge, .liga-detail-row').forEach(el => el.remove());
+  document.querySelectorAll('.liga-badge, .liga-total-badge, .liga-detail-row, .liga-print-price').forEach(el => el.remove());
   document.querySelectorAll(`[${INJECTED_ATTR}]`).forEach(el => el.removeAttribute(INJECTED_ATTR));
   document.querySelectorAll('[data-liga-seen]').forEach(el => el.removeAttribute('data-liga-seen'));
+  document.querySelectorAll('[data-liga-print-seen]').forEach(el => el.removeAttribute('data-liga-print-seen'));
   document.querySelectorAll('[data-liga-uid]').forEach(el => {
     delete el._ligaPrice;
     delete el._ligaQty;
@@ -316,17 +349,19 @@ async function processCardWrapper(wrapper) {
   applyResultToBadge(badge, result, cardData);
 
   if (result.error) {
-    wrapper.setAttribute(INJECTED_ATTR, 'error');
-    trackNotFound(cardData.name, result);
+    // 3 categorias: falha temporária, sem preço cadastrado, não encontrada
+    const state = result.transient ? 'transient' : (result.notFound ? 'error' : 'noprice');
+    wrapper.setAttribute(INJECTED_ATTR, state);
+    trackResult(cardData.name, result);
   } else {
     wrapper.setAttribute(INJECTED_ATTR, 'done');
     wrapper._ligaPrice = result.value;
     wrapper._ligaQty = cardData.quantity;
     wrapper._ligaExclude = cardData.excludeFromTotal || false;
-    stats.priced++;
-    if (result.approximate) stats.approximate++;
+    stats.pricedUids.add(uid);
+    if (result.approximate) stats.approximateUids.add(uid);
     if (result.conditionFallback) {
-      stats.filterFallback++;
+      stats.filterFallbackUids.add(uid);
       const reason = result.filterFallbackReason || 'unknown';
       stats.filterFallbackReasons[reason] = (stats.filterFallbackReasons[reason] || 0) + 1;
     }
@@ -349,6 +384,8 @@ function processDetailViews() {
     link.setAttribute('data-liga-seen', '1');
     // Ignora links que estão dentro da grade (já tratados pelo badge)
     if (link.closest('[class*="deckCardWrapper_container"]')) continue;
+    // Ignora entradas do seletor de printing (tratadas por processPrintingSelector)
+    if (link.closest('[data-liga-print-seen]')) continue;
 
     // Sobe até achar um container que também tenha imagem scryfall
     let node = link.parentElement;
@@ -430,7 +467,203 @@ async function injectDetailRow(container) {
   }
 }
 
+// ===== Seletor de printing (escolher a impressão da carta) =====
+// O Archidekt lista todas as impressões da carta, cada uma com preço do TCGplayer.
+// Injetamos o preço da LigaMagic ao lado de cada uma. A Liga indexa por set+collector,
+// não pelo uid do Scryfall, então resolvemos uid → {set, collectorNumber} via Scryfall.
+
+// uid do Scryfall → { name, set, num, finishes } (cache da sessão, evita refetch)
+const scryfallByUid = new Map();
+
+// Reúne "entradas de carta com preço" fora da grade: nó mais justo que contém
+// exatamente uma imagem scryfall e um link de loja. Agrupa por elemento pai —
+// vários irmãos com o mesmo pai = lista do seletor de printing (a mesma carta
+// em várias impressões). O modal de detalhe (1 carta sozinha) fica para processDetailViews.
+function processPrintingSelector() {
+  const links = document.querySelectorAll(
+    'a[href*="tcgplayer.com"], a[href*="cardkingdom.com"], a[href*="cardmarket.com"]'
+  );
+
+  const seenEntries = new Set();
+  const entries = [];
+  for (const link of links) {
+    if (link.closest('[class*="deckCardWrapper_container"]')) continue; // grade
+
+    // Sobe até o nó mais justo com exatamente UMA imagem scryfall (a impressão da entrada)
+    let node = link.parentElement;
+    let entryEl = null;
+    for (let i = 0; i < 10 && node; i++) {
+      if (node.querySelectorAll('img[src*="scryfall.io"]').length === 1) { entryEl = node; break; }
+      node = node.parentElement;
+    }
+    if (!entryEl || seenEntries.has(entryEl)) continue;
+
+    const img = entryEl.querySelector('img[src*="scryfall.io"]');
+    const uid = img && extractUid(img.src);
+    if (!uid) continue;
+
+    seenEntries.add(entryEl);
+    entries.push({ entryEl, link, uid });
+  }
+
+  // Agrupa por pai; grupos com 2+ entradas = seletor de printing
+  const byParent = new Map();
+  for (const e of entries) {
+    const p = e.entryEl.parentElement;
+    if (!p) continue;
+    if (!byParent.has(p)) byParent.set(p, []);
+    byParent.get(p).push(e);
+  }
+
+  for (const group of byParent.values()) {
+    if (group.length >= 2) processPrintingGroup(group);
+  }
+}
+
+async function processPrintingGroup(group) {
+  // Só entradas ainda não processadas
+  const pending = group.filter(e => !e.entryEl.hasAttribute('data-liga-print-seen'));
+  if (!pending.length) return;
+  for (const e of pending) e.entryEl.setAttribute('data-liga-print-seen', 'loading');
+
+  const gen = renderGen;
+
+  // Resolve set/collector/nome de cada impressão via Scryfall
+  try {
+    await resolveScryfall(pending.map(e => e.uid));
+  } catch (err) {
+    console.warn('[LigaMagic] Scryfall falhou no seletor de printing:', err);
+    return; // entradas ficam marcadas; reabrir o seletor (DOM novo) tenta de novo
+  }
+  if (gen !== renderGen) return;
+
+  // Monta a lista de printings (descarta uids que o Scryfall não resolveu)
+  const resolved = [];
+  for (const e of pending) {
+    const sc = scryfallByUid.get(e.uid);
+    if (!sc) continue;
+    const onlyFoil = sc.finishes.includes('foil') && !sc.finishes.includes('nonfoil');
+    const foil = onlyFoil || entryIsFoil(e.entryEl);
+    resolved.push({ ...e, name: sc.name, editionCode: sc.set, collectorNumber: sc.num, foil });
+  }
+  if (!resolved.length) return;
+
+  // Todas as impressões são da mesma carta → 1 chamada (1 fetch real à Liga, com cache)
+  const cardName = resolved[0].name;
+  const printings = resolved.map(r => ({
+    editionCode: r.editionCode,
+    collectorNumber: r.collectorNumber,
+    foil: r.foil,
+  }));
+
+  // Injeta placeholders agora (feedback visual imediato)
+  for (const r of resolved) {
+    r.priceEl = injectPrintPrice(r.entryEl, r.link);
+  }
+
+  const resp = await requestPrintingPrices(cardName, printings);
+  if (gen !== renderGen) return;
+
+  const results = (resp && resp.results) || [];
+  resolved.forEach((r, i) => {
+    if (!r.priceEl || !document.contains(r.priceEl)) return;
+    applyPrintResult(r.priceEl, results[i], cardName);
+  });
+}
+
+// Detecta se a entrada do seletor é a versão foil (texto "Foil", ignorando "Non-foil")
+function entryIsFoil(entryEl) {
+  const txt = (entryEl.textContent || '').toLowerCase();
+  return /\bfoil\b/.test(txt) && !/non[\s-]?foil/.test(txt);
+}
+
+// Resolve um lote de uids do Scryfall (endpoint collection: até 75 por request).
+// Preenche scryfallByUid. Lança em falha de rede para o chamador tratar.
+async function resolveScryfall(uids) {
+  const missing = [...new Set(uids)].filter(u => !scryfallByUid.has(u));
+  for (let i = 0; i < missing.length; i += 75) {
+    const batch = missing.slice(i, i + 75);
+    const resp = await fetch('https://api.scryfall.com/cards/collection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ identifiers: batch.map(id => ({ id })) }),
+    });
+    if (!resp.ok) throw new Error(`Scryfall collection HTTP ${resp.status}`);
+    const data = await resp.json();
+    for (const c of (data.data || [])) {
+      scryfallByUid.set(c.id, {
+        name: c.name,
+        set: c.set,
+        num: c.collector_number,
+        finishes: c.finishes || [],
+      });
+    }
+  }
+}
+
+// Cria e insere o elemento de preço Liga numa entrada de print (antes do link de loja)
+function injectPrintPrice(entryEl, beforeLink) {
+  if (entryEl.querySelector('.liga-print-price')) return entryEl.querySelector('.liga-print-price');
+
+  const el = document.createElement('a');
+  el.className = 'liga-print-price';
+  el.target = '_blank';
+  el.rel = 'noopener noreferrer';
+  el.href = LIGA_HOME;
+
+  const logo = document.createElement('img');
+  logo.src = LIGA_LOGO_URL;
+  logo.alt = 'LigaMagic';
+  logo.className = 'liga-print-price__logo';
+
+  const price = document.createElement('span');
+  price.className = 'liga-print-price__price';
+  price.textContent = '…';
+
+  el.appendChild(logo);
+  el.appendChild(price);
+
+  if (beforeLink && beforeLink.parentElement) {
+    beforeLink.insertAdjacentElement('beforebegin', el);
+  } else {
+    entryEl.appendChild(el);
+  }
+  return el;
+}
+
+function applyPrintResult(el, result, cardName) {
+  const price = el.querySelector('.liga-print-price__price');
+  if (!result || result.error) {
+    if (result && result.transient) {
+      price.textContent = '…';
+      el.title = 'Falha temporária ao consultar a LigaMagic';
+      return;
+    }
+    price.textContent = result && result.notFound ? '–' : 's/ preço';
+    el.title = result && result.notFound
+      ? 'Carta não encontrada na LigaMagic'
+      : 'Sem preço cadastrado na LigaMagic';
+    if (result && result.url) el.href = result.url;
+    else el.href = LIGA_HOME + '/?view=cards/search&card=' + encodeURIComponent(cardName.split(' // ')[0]);
+    return;
+  }
+
+  price.textContent = (result.approximate ? '~' : '') + formatBRL(result.value);
+  if (result.url) el.href = result.url;
+  el.title = result.approximate
+    ? 'Preço aproximado na LigaMagic — clique para ver'
+    : 'Preço na LigaMagic — clique para ver';
+}
+
 // ===== Comunicação com background =====
+
+async function requestPrintingPrices(cardName, printings) {
+  try {
+    return await chrome.runtime.sendMessage({ type: 'getPrintingPrices', cardName, printings });
+  } catch (e) {
+    return { results: [] };
+  }
+}
 
 async function requestPrice(cardData) {
   try {
@@ -446,10 +679,12 @@ async function requestPrice(cardData) {
   }
 }
 
-function trackNotFound(name, result) {
-  if (!stats.notFound.includes(name)) {
-    stats.notFound.push(name);
-  }
+function trackResult(name, result) {
+  // Falha temporária e "sem preço" não são "não encontrada" — listas separadas
+  const list = result.transient ? stats.transient
+    : result.notFound ? stats.notFound
+    : stats.noPrice;
+  if (!list.includes(name)) list.push(name);
 }
 
 // ===== Badge da grade =====
@@ -480,11 +715,26 @@ function applyResultToBadge(badge, result, cardData) {
   badge.classList.remove('liga-badge--loading');
 
   if (result.error) {
+    if (result.transient) {
+      // Falha temporária: mantém aparência neutra de "pendente"
+      badge.classList.add('liga-badge--loading');
+      span.textContent = '…';
+      badge.title = 'Falha temporária ao consultar a LigaMagic — reabra para tentar de novo';
+      if (result.url) badge.href = result.url;
+      return;
+    }
     badge.classList.add('liga-badge--error');
-    span.textContent = '–';
-    badge.title = result.error + ' — clique para buscar na Liga';
-    // Mesmo sem preço, linka pra busca da carta na Liga
-    badge.href = LIGA_HOME + '/?view=cards/search&card=' + encodeURIComponent(cardData.name.split(' // ')[0]);
+    if (result.notFound) {
+      // Página não encontrada → link de busca
+      span.textContent = '–';
+      badge.title = 'Carta não encontrada na LigaMagic — clique para buscar';
+      badge.href = LIGA_HOME + '/?view=cards/search&card=' + encodeURIComponent(cardData.name.split(' // ')[0]);
+    } else {
+      // Página existe, sem preço cadastrado → link pra carta
+      span.textContent = 's/ preço';
+      badge.title = 'Carta sem preço cadastrado na LigaMagic — clique para ver a página';
+      badge.href = result.url || (LIGA_HOME + '/?view=cards/search&card=' + encodeURIComponent(cardData.name.split(' // ')[0]));
+    }
     return;
   }
 
@@ -526,9 +776,13 @@ function updateDeckTotal() {
     if (w.querySelector('.liga-badge--approx')) hasApprox = true;
   }
 
-  const errors = document.querySelectorAll(`[class*="deckCardWrapper_container"][${INJECTED_ATTR}="error"]`).length;
-  const loading = document.querySelectorAll(`[class*="deckCardWrapper_container"][${INJECTED_ATTR}="loading"]`).length;
-  const missing = errors > 0 || loading > 0 || hasApprox;
+  const incomplete = document.querySelectorAll(
+    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="error"],` +
+    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="noprice"],` +
+    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="transient"],` +
+    `[class*="deckCardWrapper_container"][${INJECTED_ATTR}="loading"]`
+  ).length;
+  const missing = incomplete > 0 || hasApprox;
 
   let totalEl = document.getElementById('liga-total-badge');
   if (!totalEl) {

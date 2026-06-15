@@ -117,3 +117,41 @@
 .liga-total-badge__price {
   /* cor sobrescrita via style.color inline — herda fonte da classe nativa */
 }
+
+/* Preço LigaMagic em cada impressão do seletor de printing */
+.liga-print-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 4px 0 0;
+  background: transparent;
+  border: none;
+  color: var(--color);
+  font-size: inherit;
+  font-weight: 700;
+  font-family: inherit;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  vertical-align: middle;
+  transition: opacity 0.2s ease;
+}
+
+.liga-print-price:hover {
+  opacity: 0.6;
+  color: var(--archidekt-orange);
+  text-decoration: none;
+}
+
+.liga-print-price__logo {
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.liga-print-price__price {
+  line-height: 1;
+}

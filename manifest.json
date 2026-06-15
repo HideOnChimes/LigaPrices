@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LigaMagic Prices for Archidekt",
-  "version": "1.6.2",
+  "version": "1.7.8",
   "description": "Mostra preços da LigaMagic.com.br em decks do Archidekt, por edição e arte exata.",
   "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": [
