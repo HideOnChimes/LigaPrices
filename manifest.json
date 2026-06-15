@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "LigaMagic Prices for Archidekt",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Mostra preços da LigaMagic.com.br em decks do Archidekt, por edição e arte exata.",
   "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": [
-    "https://archidekt.com/*",
     "https://www.ligamagic.com.br/*",
-    "https://api.scryfall.com/*",
+    "https://api.scryfall.com/cards/*",
     "https://repositorio.sbrauble.com/*"
   ],
   "background": {
@@ -16,7 +15,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://archidekt.com/decks/*"],
+      "matches": ["https://archidekt.com/*"],
       "js": ["src/content/archidekt.js"],
       "css": ["src/content/archidekt.css"],
       "run_at": "document_idle"
