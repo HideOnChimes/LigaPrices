@@ -27,6 +27,7 @@ let pendingReinit = false;      // URL mudou enquanto reinit estava em curso
 let deckRefetching = false;
 let deckRefetchTimer = null;
 let renderGen = 0; // invalida resultados async obsoletos após refresh
+let deckNameMap
 
 // Estatísticas para o popup. Contagens por uid (Set) para não inflar em re-render do React.
 const stats = {
@@ -120,6 +121,7 @@ async function reinit() {
     removeAllBadges();
     resetStats();
     uidMap = {};
+    deckNameMap = {};
     fetchedDeckIds = new Set();
 
     deckIds = getDeckIds();
@@ -184,6 +186,11 @@ async function fetchDeckData(deckId) {
   const resp = await fetch(`/api/decks/${deckId}/`);
   if (!resp.ok) throw new Error(`API status ${resp.status}`);
   const data = await resp.json();
+  deckNameMap[deckId] = {
+    name: data.name || '',
+    format: typeof data.format === 'string' ? data.format : (data.format?.name || ''),
+    description: data.description || '',
+  };
 
   // Categorias excluídas do total (Maybeboard, etc.)
   const excludedCategories = new Set(
@@ -205,6 +212,7 @@ async function fetchDeckData(deckId) {
       quantity: entry.quantity || 1,
       excludeFromTotal: primaryCategory != null && excludedCategories.has(primaryCategory),
       isBasicLand: BASIC_LANDS.has(entry.card?.oracleCard?.name || ''),
+      category: primaryCategory || null,
     };
   }
   return map;
@@ -826,7 +834,7 @@ function computeTotals() {
   );
 }
 
-function updateDeckTotal() {
+function updateDeckTotal() { //TODO: Link que monta o deck completo
   const { total, missing } = computeTotals();
 
   let totalEl = document.getElementById('liga-total-badge');
@@ -930,7 +938,7 @@ function injectCategoryTotals() {
 // e injetamos o valor em R$ ao lado dessa linha.
 const POPUP_MARKER = 'Excluding basic lands';
 
-function injectPopupBRL(root) {
+function injectPopupBRL(root) { //TODO: Link que cria o deck sem as lands
   // Acha a folha cujo texto começa com o marcador (a própria linha "Excluding basic lands: $X").
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
     acceptNode(el) {
@@ -948,7 +956,11 @@ function injectPopupBRL(root) {
 
   const { exclBasics, missing } = computeTotals();
   const span = document.createElement('span');
+  const createDeckLiga = document.createElement('a');
+  createDeckLiga.href = '#';
+  span.appendChild(createDeckLiga);
+  createDeckLiga.textContent  = ' · ' + (missing ? '~' : '') + formatBRL(exclBasics);
   span.className = 'liga-popup-brl';
-  span.textContent = ' · ' + (missing ? '~' : '') + formatBRL(exclBasics);
+  //span.textContent;
   line.appendChild(span);
 }

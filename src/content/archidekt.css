@@ -125,6 +125,15 @@
   white-space: nowrap;
 }
 
+.liga-popup-brl a{
+  color: #7ddf7d;
+  transition: all 0.2s ease;
+}
+
+.liga-popup-brl a:hover{
+  color: var(--archidekt-orange);
+}
+
 /* Total em R$ por categoria, ao lado do "Price: $X" do cabeçalho da seção */
 .liga-cat-brl {
   color: #7ddf7d;
