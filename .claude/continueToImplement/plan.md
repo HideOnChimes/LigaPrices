@@ -1,202 +1,116 @@
-# Plano: Exportar deck para LigaMagic (TODOs do archidekt.js)
+# Plano: Export de deck p/ LigaMagic — Format + Comandantes
 
 ## Contexto
 
-Dois TODOs em `src/content/archidekt.js`:
-1. `updateDeckTotal` (L829) — badge de total é `<span>` inerte. Clicar deve abrir deck completo na LigaMagic.
-2. `injectPopupBRL` (L933) — link `createDeckLiga` tem `href='#'` sem ação. Clicar deve abrir deck **sem terras básicas**.
+Feature de exportar deck do Archidekt → formulário de criação da LigaMagic
+(`?view=dks/novo&tipo=2`) via `chrome.storage.local` (chave `liga_export_pending`)
++ content script `ligamagic-import.js`. Nome, decklist, sideboard, maybeboard e
+descrição já funcionam. Este doc cobre formato e comandantes.
 
-`src/content/ligamagic-import.js` **já criado** pelo usuário — preenche o formulário `?view=dks/novo&tipo=2`. Tem bugs a corrigir (ver abaixo).
-
-A LigaMagic espera os campos: `nome`, `formato`, `descrição`, `decklist` (main), `sideboard`, `maybeboard`.
-O `uidMap` atual não distingue sideboard de maybeboard (guarda só o bool `excludeFromTotal`).
+Arquivos: `src/content/archidekt.js`, `src/content/ligamagic-import.js`.
 
 ---
 
-## 1. Corrigir bugs em `src/content/ligamagic-import.js`
+## Parte A — Format ✅ FEITO
 
-Dois bugs no arquivo atual:
+Campo real da API do Archidekt é **`data.deckFormat`** (número), NÃO `data.format`.
+`deckFormat: 3` = Commander.
 
-**Bug 1:** `dispatchEvent` chamado fora do `if`, crasha se o campo não existir na página.
-Todos os blocos precisam seguir o padrão:
-```javascript
-if (nameField && data.name) {
-  nameField.value = data.name;
-  nameField.dispatchEvent(new Event('input', { bubbles: true }));
-}
-```
-(atualmente o `dispatchEvent` fica na linha seguinte, fora do `if`)
+- `archidekt.js`: const `ARCHIDEKT_FORMATS` (id numérico → nome). Em `fetchDeckData`:
+  ```javascript
+  format: ARCHIDEKT_FORMATS[data.deckFormat] || (typeof data.deckFormat === 'string' ? data.deckFormat : ''),
+  ```
+- `ligamagic-import.js`: const `FORMAT_MAP` (nome minúsculo → value do `<select>` da Liga).
+  Select `#deck_formato`: setar `.value` + dispatch `change` (dispara `refreshRulesFormat()`
+  que CRIA os campos de comandante dinamicamente).
 
-**Bug 2:** Botão de submit usa evento `'input'` em vez de `click`:
-```javascript
-// errado (atual):
-createDeckBtn.dispatchEvent(new Event('input', { bubbles: true }));
-// correto:
-if (createDeckBtn) createDeckBtn.click();
-```
+> Pendência: remover `console.log` temporário em `ligamagic-import.js` (~L41).
+> Ids do `ARCHIDEKT_FORMATS` >13 não confirmados — completar conforme testar.
 
 ---
 
-## 2. `src/content/archidekt.js`
+## Parte B — Comandantes ✅ FEITO
 
-### 2a. Novo global — após L29 (`let renderGen = 0;`)
+### B1. `archidekt.js`
+`buildExportParts(excludeBasics)` coleta `commanders` (cartas com
+`card.category === 'commander'`), tira do main com `continue`, retorna no objeto.
+`openLigaMagicExport` faz destructure de `commanders` e inclui no payload
+`liga_export_pending`.
 
-```javascript
-// deckId → { name, format, description } — metadados do deck para exportação
-let deckNameMap = {};
+### B2. `ligamagic-import.js` — autocomplete (devbridge jQuery)
+Os campos `txt_deck_commander` / `txt_deck_commanderparceiro` são **autocomplete**
+(`jquery.autocomplete-v17-min.js`). Setar `.value` NÃO comita — precisa disparar a
+seleção numa sugestão.
+
+DOM do dropdown:
+```
+.auto-sugg .autocomplete > div[title="Nome Exato"]   (1ª opção = class="selected")
 ```
 
-### 2b. Resetar `deckNameMap` no `reinit()` — dentro do `try` em `reinit()` (~L121), junto com o reset de `uidMap`
+Implementado:
+- `waitFor(fn, tries, gap)` — polling até truthy / timeout.
+- `findSuggBox()` — dropdown ativo (display != none + tem `div[title]`).
+- `fillCommanderField(sel, name)` — `focus` + `value` + dispatch `input`+`keyup` →
+  `await waitFor(findSuggBox)` → acha `div[title]===name` (fallback `.selected`/1ª) →
+  dispara `mousedown`/`mouseup`/`click`.
+- Sequencial: c1 comita antes de c2 (dropdown é único, depende do foco).
+- Espera o campo existir e editável (`!disabled && !readOnly`) antes de começar.
 
-Procurar o bloco onde `uidMap = {}` é resetado (~L122) e adicionar na linha seguinte:
-```javascript
-deckNameMap = {};
-```
-
-### 2c. `fetchDeckData` — capturar metadados e categoria por carta
-
-Na função `fetchDeckData` (L183), logo após `const data = await resp.json();` (L186), adicionar:
-```javascript
-deckNameMap[deckId] = {
-  name: data.name || '',
-  // format pode vir como string ou objeto {name: "Modern"} dependendo da versão da API
-  format: typeof data.format === 'string' ? data.format : (data.format?.name || ''),
-  description: data.description || '',
-};
-```
-
-No loop de cards (L196), dentro do objeto `map[uid]` (L200-208), adicionar o campo `category` para distinguir sideboard de maybeboard:
-```javascript
-map[uid] = {
-  name: ...,
-  editionCode: ...,
-  collectorNumber: ...,
-  modifier: ...,
-  quantity: ...,
-  excludeFromTotal: ...,
-  isBasicLand: ...,
-  category: primaryCategory || null,  // ← ADICIONAR (já existe no escopo como `primaryCategory`)
-};
-```
-
-### 2d. Novas funções — inserir antes de `updateDeckTotal` (L829)
-
-```javascript
-// Separa o uidMap em main deck, sideboard e maybeboard.
-// excludeBasics=true: remove terras básicas do main deck (para o link "Excluding basic lands").
-function buildExportParts(excludeBasics) {
-  const main = [], sideboard = [], maybeboard = [];
-  for (const card of Object.values(uidMap)) {
-    const line = `${card.quantity} ${card.name}`;
-    const cat = (card.category || '').toLowerCase();
-    if (cat.includes('side')) {
-      sideboard.push(line);
-    } else if (cat.includes('maybe')) {
-      maybeboard.push(line);
-    } else {
-      if (card.excludeFromTotal) continue; // outras categorias excluídas (commander avulso, etc.)
-      if (excludeBasics && card.isBasicLand) continue;
-      main.push(line);
-    }
-  }
-  return {
-    deckList: main.join('\n'),
-    sideboard: sideboard.join('\n'),
-    maybeboard: maybeboard.join('\n'),
-  };
-}
-
-async function openLigaMagicExport(excludeBasics) {
-  const id = [...deckIds][0];
-  const meta = id ? (deckNameMap[id] || {}) : {};
-  const { deckList, sideboard, maybeboard } = buildExportParts(excludeBasics);
-  await chrome.storage.local.set({
-    liga_export_pending: {
-      name: meta.name || '',
-      format: meta.format || '',
-      description: meta.description || '',
-      deckList,
-      sideboard,
-      maybeboard,
-      ts: Date.now(),
-    },
-  });
-  window.open('https://www.ligamagic.com.br/?view=dks/novo&tipo=2', '_blank');
-}
-```
-
-### 2e. `updateDeckTotal` (L829) — remover TODO e adicionar click
-
-Linha 829: remover `//TODO: Link que monta o deck completo` do cabeçalho da função.
-
-Dentro do bloco `if (!totalEl)` (L833-855), logo após `deckPriceEl.insertAdjacentElement('afterend', totalEl);` (L854), adicionar:
-```javascript
-    totalEl.addEventListener('click', () => openLigaMagicExport(false));
-```
-
-Na L861, substituir o título do total:
-```javascript
-    : 'Total do deck em R$ — clique para criar na LigaMagic';
-```
-
-### 2f. `injectPopupBRL` (L933) — remover TODO e ligar o link
-
-Linha 933: remover `//TODO: Link que cria o deck sem as lands`.
-
-Linhas 951-953 (criação do `createDeckLiga`), substituir:
-```javascript
-  const createDeckLiga = document.createElement('a');
-  createDeckLiga.href = '#';
-```
-por:
-```javascript
-  const createDeckLiga = document.createElement('a');
-  createDeckLiga.href = '#';
-  createDeckLiga.title = 'Criar deck na LigaMagic sem terras básicas';
-  createDeckLiga.addEventListener('click', e => {
-    e.preventDefault();
-    openLigaMagicExport(true);
-  });
-```
+Seletores usam `[id*=txt_deck_commander]` (sem tag — campo é `input`, não textarea).
+`:not([id*=parceiro])` separa o comandante principal do parceiro.
 
 ---
 
-## 3. `manifest.json` — adicionar content script da LigaMagic
+## Bugs já corrigidos nesta sessão (histórico)
 
-No array `content_scripts` (L17-27), adicionar segunda entrada após o bloco do Archidekt:
-```json
-{
-  "matches": ["https://www.ligamagic.com.br/*"],
-  "js": ["src/content/ligamagic-import.js"],
-  "run_at": "document_end"
-}
-```
-O host_permission `https://www.ligamagic.com.br/*` já existe (L8).
+1. `openLigaMagicExport` faltava `async` → SyntaxError quebrava archidekt.js inteiro.
+2. `let deckNameMap` sem `= {}` → TypeError em `fetchDeckData` → deck não carregava (0 em tudo).
+3. `ligamagic-import.js` L1 `return` top-level → SyntaxError → envolvido em IIFE.
+4. `createDeckBtn.click()` sem guard.
+5. Seletor `textarea[id#txt_deck]` inválido → `textarea#txt_deck`.
+6. `commanders` não declarado / não destructurado em archidekt.js.
+7. `data.format` → `data.deckFormat`.
 
 ---
 
-## 4. `src/content/archidekt.css` — badge de total clicável
+## Pendências abertas
 
-Em `.liga-total-badge` (~L104), mudar `cursor: default` para `cursor: pointer` e adicionar hover:
-```css
-.liga-total-badge {
-  /* ... existente ... */
-  cursor: pointer;
-}
-
-.liga-total-badge:hover .liga-total-badge__price {
-  opacity: 0.75;
-}
-```
+- ⚠️ Remover `console.log` de debug em `ligamagic-import.js` (~L41).
+- ⚠️ Auto-submit (`createDeckBtn.click()`) está **comentado** (L95). Submit manual por ora.
+  Pra ligar: descomentar + mover pra DEPOIS dos comandantes comitarem (são async).
+- ⚠️ `excludeBasics` em `buildExportParts` ainda no topo do loop (antes do split) — terras
+  básicas de sideboard/maybeboard somem no modo "sem lands". Mover pra dentro do `else` se incomodar.
+- ⚠️ Rate-limit Cloudflare (Error 1015): testar 1 deck por vez. Enquanto banido, preços
+  também falham (mesmo host).
+- ⚠️ Text view do Archidekt: preços não carregam (sem `img scryfall` por linha → sem uid).
+  Separado do export; precisa do outerHTML de uma linha do text view p/ implementar.
 
 ---
+
+## Campos do formulário LigaMagic (`?view=dks/novo&tipo=2`)
+
+| Campo | Seletor | Tipo |
+|-------|---------|------|
+| Nome | `input[id*=deck_nome]` | input |
+| Formato | `select[id*=deck_formato]` | **select** (onchange cria campos commander) |
+| Descrição | `textarea[id*=txt_descricao]` | textarea |
+| Decklist main | `textarea#txt_deck` | textarea (id exato!) |
+| Sideboard | `textarea[id*=txt_side]` | textarea |
+| Maybeboard | `textarea[id*=txt_maybe]` | textarea |
+| Comandante | `[id*=txt_deck_commander]:not([id*=parceiro])` | **autocomplete** |
+| Comandante parceiro | `[id*=txt_deck_commanderparceiro]` | **autocomplete** |
+| Botão criar | `button[name*=btCadDeck]` | button |
+
+## Payload `liga_export_pending`
+`{ name, format, description, deckList, sideboard, maybeboard, commanders[], ts }`
+TTL 60s. `commanders` = array de nomes (só o nome, sem quantidade).
 
 ## Verificação
 
-1. Reload unpacked → abrir deck no Archidekt
-2. Clicar no badge verde total (R$) → nova aba abre `?view=dks/novo&tipo=2` com nome, main deck e sideboard/maybeboard preenchidos e submit automático
-3. Hover "Est. cost" → popup → clicar no R$ ao lado de "Excluding basic lands" → deck sem terras básicas
-4. Conferir no console do SW que `liga_export_pending` foi escrito e limpado
-5. Deck com sideboard: confirmar que cartas aparecem no campo `txt_side`
-6. Deck com maybeboard: confirmar campo `txt_maybe` preenchido
-7. Se campos não preencherem: F12 na página da Liga e conferir IDs reais dos campos
+1. Reload unpacked → deck Commander (1 comandante)
+2. Clicar no total → Liga: format=Commander, comandante COMITADO (sugestão selecionada),
+   comandante fora da decklist principal
+3. Deck 2 comandantes → 2º no `txt_deck_commanderparceiro`
+4. Deck não-Commander (Modern) → format certo, sem campo comandante, decklist cheia
+5. Conferir decklist sem comandante(s)
+6. Ir devagar (rate-limit 1015)

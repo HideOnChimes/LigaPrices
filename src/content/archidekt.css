@@ -104,6 +104,11 @@
   cursor: default;
   vertical-align: baseline;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.liga-total-badge.liga-badge:hover .liga-total-badge__price{
+  opacity: 0.75;
 }
 
 .liga-total-badge__logo {
