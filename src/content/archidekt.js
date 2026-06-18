@@ -1013,7 +1013,7 @@ function injectPopupBRL(root) { //TODO: Link que cria o deck sem as lands
   createDeckLiga.title = 'Criar deck na Liga Magic (Sem terrenos básicos)';
   createDeckLiga.addEventListener('click', e => {
     e.preventDefault();
-    openLigaMagicExport(true);
+    openLigaMagicExport(false);
   })
   span.appendChild(createDeckLiga);
   createDeckLiga.textContent  = ' · ' + (missing ? '~' : '') + formatBRL(exclBasics);
