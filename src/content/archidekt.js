@@ -12,6 +12,10 @@ const BASIC_LANDS = new Set([
   'Snow-Covered Mountain', 'Snow-Covered Forest',
 ]);
 
+const ARCHIDEKT_FORMATS = {
+  1:'Standard',2:'Modern',3:'Commander',4:'Legacy',5:'Vintage',6:'Pauper',7:'Custom',8:'Frontier',9:'Future Standard', 10:'Penny Dreadful', 11:'1v1 Commander', 12:'Dual Commander',13:'Brawl',
+}
+
 // uid → { editionCode, collectorNumber, modifier, name, quantity, excludeFromTotal, isBasicLand }
 // Mescla os cards de todos os decks da página (suporta /compare com 2+ decks).
 let uidMap = {};
@@ -27,6 +31,7 @@ let pendingReinit = false;      // URL mudou enquanto reinit estava em curso
 let deckRefetching = false;
 let deckRefetchTimer = null;
 let renderGen = 0; // invalida resultados async obsoletos após refresh
+let deckNameMap = {}
 
 // Estatísticas para o popup. Contagens por uid (Set) para não inflar em re-render do React.
 const stats = {
@@ -120,6 +125,7 @@ async function reinit() {
     removeAllBadges();
     resetStats();
     uidMap = {};
+    deckNameMap = {};
     fetchedDeckIds = new Set();
 
     deckIds = getDeckIds();
@@ -184,6 +190,13 @@ async function fetchDeckData(deckId) {
   const resp = await fetch(`/api/decks/${deckId}/`);
   if (!resp.ok) throw new Error(`API status ${resp.status}`);
   const data = await resp.json();
+  deckNameMap[deckId] = {
+    name: data.name || '',
+    format: ARCHIDEKT_FORMATS[data.deckFormat] || (typeof data.format === 'string'?data.format:''),
+    description: data.description || '',
+  };
+
+  console.log('[Liga] format raw:', data.deckFormat, '→ nome:', deckNameMap[deckId].deckFormat);
 
   // Categorias excluídas do total (Maybeboard, etc.)
   const excludedCategories = new Set(
@@ -205,6 +218,7 @@ async function fetchDeckData(deckId) {
       quantity: entry.quantity || 1,
       excludeFromTotal: primaryCategory != null && excludedCategories.has(primaryCategory),
       isBasicLand: BASIC_LANDS.has(entry.card?.oracleCard?.name || ''),
+      category: primaryCategory || null,
     };
   }
   return map;
@@ -826,7 +840,53 @@ function computeTotals() {
   );
 }
 
-function updateDeckTotal() {
+function buildExportParts(excludeBasics){
+  const main = [], sideboard = [], maybeboard = [], commanders=[];
+  for(const card of Object.values(uidMap)){
+    const line = `${card.quantity} ${card.name}`;
+    const cat = (card.category || '').toLowerCase();
+    if(excludeBasics && card.isBasicLand) continue;
+    if(cat ==='commander'){
+      commanders.push(card.name);
+      continue;
+    }
+    if(cat.includes('side')){
+      sideboard.push(line);
+    }else if (cat.includes('maybe')){
+      maybeboard.push(line);
+    }else{
+      if(card.excludeFromTotal) continue;
+      main.push(line);
+    }
+  }
+  return {
+    deckList: main.join('\n'),
+    sideboard: sideboard.join('\n'),
+    maybeboard: maybeboard.join('\n'),
+    commanders,
+  };
+}
+
+async function openLigaMagicExport(excludeBasics){
+  const id = [...deckIds][0];
+  const meta = id ? (deckNameMap[id] || {}) : {};
+  const {deckList, sideboard, maybeboard, commanders} = buildExportParts(excludeBasics);
+  await chrome.storage.local.set({
+    liga_export_pending: {
+      name:meta.name || '',
+      format:meta.format || '',
+      description: meta.description || '',
+      deckList,
+      sideboard,
+      maybeboard,
+      commanders,
+      ts: Date.now(),
+    },
+  });
+  window.open('https://www.ligamagic.com.br/?view=dks/novo&tipo=2', '_blank')
+}
+
+function updateDeckTotal() { //TODO: Link que monta o deck completo
   const { total, missing } = computeTotals();
 
   let totalEl = document.getElementById('liga-total-badge');
@@ -852,6 +912,7 @@ function updateDeckTotal() {
     totalEl.appendChild(logoImg);
     totalEl.appendChild(priceSpan);
     deckPriceEl.insertAdjacentElement('afterend', totalEl);
+    totalEl.addEventListener('click', () => openLigaMagicExport(false));
   }
 
   const priceSpan = totalEl.querySelector('.liga-total-badge__price');
@@ -930,7 +991,7 @@ function injectCategoryTotals() {
 // e injetamos o valor em R$ ao lado dessa linha.
 const POPUP_MARKER = 'Excluding basic lands';
 
-function injectPopupBRL(root) {
+function injectPopupBRL(root) { //TODO: Link que cria o deck sem as lands
   // Acha a folha cujo texto começa com o marcador (a própria linha "Excluding basic lands: $X").
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
     acceptNode(el) {
@@ -948,7 +1009,15 @@ function injectPopupBRL(root) {
 
   const { exclBasics, missing } = computeTotals();
   const span = document.createElement('span');
+  const createDeckLiga = document.createElement('a');
+  createDeckLiga.title = 'Criar deck na Liga Magic (Sem terrenos básicos)';
+  createDeckLiga.addEventListener('click', e => {
+    e.preventDefault();
+    openLigaMagicExport(false);
+  })
+  span.appendChild(createDeckLiga);
+  createDeckLiga.textContent  = ' · ' + (missing ? '~' : '') + formatBRL(exclBasics);
   span.className = 'liga-popup-brl';
-  span.textContent = ' · ' + (missing ? '~' : '') + formatBRL(exclBasics);
+  //span.textContent;
   line.appendChild(span);
 }

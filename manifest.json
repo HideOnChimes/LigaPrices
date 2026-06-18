@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LigaMagic Prices for Archidekt",
-  "version": "1.7.13",
+  "version": "1.7.14",
   "description": "Mostra preços da LigaMagic.com.br em decks do Archidekt, por edição e arte exata.",
   "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": [
@@ -19,6 +19,11 @@
       "js": ["src/content/archidekt.js"],
       "css": ["src/content/archidekt.css"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.ligamagic.com.br/*"],
+      "js": ["src/content/ligamagic-import.js"],
+      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [

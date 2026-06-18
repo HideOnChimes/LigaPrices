@@ -2,157 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      width: 300px;
-      margin: 0;
-      padding: 14px;
-      background: #1a1a1a;
-      color: #e0e0e0;
-      font-size: 13px;
-    }
-    h1 {
-      font-size: 14px;
-      margin: 0 0 12px;
-      color: #7ddf7d;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    h1 img { width: 18px; height: 18px; border-radius: 3px; }
-    .row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
-    }
-    select {
-      background: #2a2a2a;
-      color: #e0e0e0;
-      border: 1px solid #444;
-      border-radius: 4px;
-      padding: 3px 6px;
-      font-size: 12px;
-    }
-    /* Toggle switch */
-    .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
-    .switch input { opacity: 0; width: 0; height: 0; }
-    .slider {
-      position: absolute; cursor: pointer; inset: 0;
-      background: #444; border-radius: 22px; transition: 0.2s;
-    }
-    .slider:before {
-      content: ""; position: absolute; height: 16px; width: 16px;
-      left: 3px; bottom: 3px; background: #ccc; border-radius: 50%; transition: 0.2s;
-    }
-    input:checked + .slider { background: #2a7a2a; }
-    input:checked + .slider:before { transform: translateX(18px); background: #7ddf7d; }
-
-    .quality-row { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .quality-boxes { display: flex; gap: 4px; width: 100%; }
-    .quality-boxes label {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
-      background: #2a2a2a;
-      border: 1px solid #444;
-      border-radius: 4px;
-      padding: 3px 0;
-      font-size: 11px;
-      cursor: pointer;
-      user-select: none;
-    }
-    .quality-boxes label:has(input:checked) {
-      background: #2a5a2a;
-      border-color: #3a7a3a;
-      color: #7ddf7d;
-    }
-    .quality-boxes input { display: none; }
-
-    .state-row { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .state-header {
-      display: flex;
-      width: 100%;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .state-actions { display: flex; gap: 4px; }
-    .btn-mini {
-      padding: 2px 7px;
-      font-size: 10px;
-      width: auto;
-      margin: 0;
-      background: #2a2a2a;
-      color: #aaa;
-      border: 1px solid #444;
-      border-radius: 3px;
-      cursor: pointer;
-    }
-    .btn-mini:hover { background: #3a3a3a; color: #e0e0e0; }
-    .state-boxes {
-      display: grid;
-      grid-template-columns: repeat(9, 1fr);
-      gap: 3px;
-      width: 100%;
-    }
-    .state-boxes label {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #2a2a2a;
-      border: 1px solid #444;
-      border-radius: 3px;
-      padding: 3px 0;
-      font-size: 10px;
-      cursor: pointer;
-      user-select: none;
-    }
-    .state-boxes label:has(input:checked) {
-      background: #2a5a2a;
-      border-color: #3a7a3a;
-      color: #7ddf7d;
-    }
-    .state-boxes input { display: none; }
-
-    .stats {
-      background: #222;
-      border: 1px solid #333;
-      border-radius: 6px;
-      padding: 8px 10px;
-      margin-bottom: 10px;
-      font-size: 12px;
-      line-height: 1.7;
-    }
-    .stats .ok { color: #7ddf7d; }
-    .stats .approx { color: #ffd770; }
-    .stats .miss { color: #df7d7d; }
-    .notfound-list {
-      max-height: 90px;
-      overflow-y: auto;
-      margin-top: 4px;
-      padding-left: 16px;
-      color: #aaa;
-      font-size: 11px;
-    }
-    button {
-      width: 100%;
-      padding: 6px;
-      margin-top: 4px;
-      background: #2a2a2a;
-      color: #ccc;
-      border: 1px solid #444;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-    button:hover { background: #3a3a3a; }
-    button.primary { background: #2a5a2a; color: #7ddf7d; border-color: #3a7a3a; }
-    button.primary:hover { background: #3a7a3a; }
-    .status { font-size: 11px; color: #888; text-align: center; margin-top: 6px; min-height: 14px; }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <h1><img src="../assets/icons/ligamagic-logo.png" alt=""> LigaMagic Prices</h1>
@@ -174,15 +24,23 @@
     </select>
   </div>
 
+  <!-- <div class="row">
+    <span>Modo de Exportação para a Liga</span>
+    <select id="exportMethod">
+      <option value="p">Personalizar Deck</option>
+      <option value="m">Auto Criar Deck</option>
+    </select>
+  </div> -->
+  
   <div class="row quality-row">
     <span>Qualidade / Estado da carta</span>
     <div class="quality-boxes" id="qualityBoxes">
-      <label title="Nova (M)"><input type="checkbox" data-q="1" checked>M</label>
+      <label title="Nova (M)"><input type="checkbox" data-q="1" unchecked>M</label>
       <label title="Praticamente Nova (NM)"><input type="checkbox" data-q="2" checked>NM</label>
-      <label title="Usada Levemente (SP)"><input type="checkbox" data-q="3" checked>SP</label>
-      <label title="Usada Moderadamente (MP)"><input type="checkbox" data-q="4" checked>MP</label>
-      <label title="Muito Usada (HP)"><input type="checkbox" data-q="5" checked>HP</label>
-      <label title="Danificada (D)"><input type="checkbox" data-q="6" checked>D</label>
+      <label title="Usada Levemente (SP)"><input type="checkbox" data-q="3" unchecked>SP</label>
+      <label title="Usada Moderadamente (MP)"><input type="checkbox" data-q="4" unchecked>MP</label>
+      <label title="Muito Usada (HP)"><input type="checkbox" data-q="5" unchecked>HP</label>
+      <label title="Danificada (D)"><input type="checkbox" data-q="6" unchecked>D</label>
     </div>
   </div>
 
@@ -227,6 +85,10 @@
 
   <div class="stats" id="stats">
     <em>Abra um deck no Archidekt para ver estatísticas.</em>
+  </div>
+
+  <div class="stats">
+    <em>Talvez você tenha que recarregar a página para a extensão reconhecer o deck</em>
   </div>
 
   <button class="primary" id="refresh">Atualizar preços da página</button>
