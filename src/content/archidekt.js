@@ -5,6 +5,10 @@ const LIGA_LOGO_URL = chrome.runtime.getURL('assets/icons/ligamagic-logo.png');
 const LIGA_HOME = 'https://www.ligamagic.com.br';
 const INJECTED_ATTR = 'data-liga-price';
 
+// Archidekt migrou as imagens de card do CDN da Scryfall (scryfall.io) para o próprio
+// (card-images.archidekt.com). Mantém scryfall.io por compatibilidade com views antigas.
+const CARD_IMG_SELECTOR = 'img[src*="card-images.archidekt.com"], img[src*="scryfall.io"]';
+
 // Terras básicas (EN) — usadas para o cálculo "Excluding basic lands" no popup do Est. cost
 const BASIC_LANDS = new Set([
   'Plains', 'Island', 'Swamp', 'Mountain', 'Forest', 'Wastes',
@@ -327,7 +331,7 @@ function processGridCards() {
 }
 
 async function processCardWrapper(wrapper) {
-  const img = wrapper.querySelector('img[src*="scryfall.io"]');
+  const img = wrapper.querySelector(CARD_IMG_SELECTOR);
   if (!img) return;
 
   const uid = extractUid(img.src);
@@ -424,7 +428,7 @@ function processDetailViews() {
     // Sobe até achar um container que também tenha imagem scryfall
     let node = link.parentElement;
     for (let i = 0; i < 8 && node; i++) {
-      if (node.querySelector('img[src*="scryfall.io"]')) {
+      if (node.querySelector(CARD_IMG_SELECTOR)) {
         containers.add(node);
         break;
       }
@@ -442,7 +446,7 @@ async function injectDetailRow(container) {
   // Não injetar detail-row em container que já tem badge da grade
   if (container.querySelector('.liga-badge')) return;
 
-  const img = container.querySelector('img[src*="scryfall.io"]');
+  const img = container.querySelector(CARD_IMG_SELECTOR);
   if (!img) return;
   const uid = extractUid(img.src);
   if (!uid) return;
@@ -527,12 +531,12 @@ function processPrintingSelector() {
     let node = link.parentElement;
     let entryEl = null;
     for (let i = 0; i < 10 && node; i++) {
-      if (node.querySelectorAll('img[src*="scryfall.io"]').length === 1) { entryEl = node; break; }
+      if (node.querySelectorAll(CARD_IMG_SELECTOR).length === 1) { entryEl = node; break; }
       node = node.parentElement;
     }
     if (!entryEl || seenEntries.has(entryEl)) continue;
 
-    const img = entryEl.querySelector('img[src*="scryfall.io"]');
+    const img = entryEl.querySelector(CARD_IMG_SELECTOR);
     const uid = img && extractUid(img.src);
     if (!uid) continue;
 
@@ -891,7 +895,7 @@ function updateDeckTotal() { //TODO: Link que monta o deck completo
 
   let totalEl = document.getElementById('liga-total-badge');
   if (!totalEl) {
-    const deckPriceEl = document.querySelector('[class*="deckPrice_orange"]');
+    const deckPriceEl = document.querySelector('[class*="deckPrice_orange"], [class*="deckPrice_trigger"]');
     if (!deckPriceEl) return;
 
     totalEl = document.createElement('span');
