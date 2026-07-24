@@ -1,5 +1,6 @@
 import { getCached, setCached, cacheKey } from '../common/storage.js';
-import { fetchLigaData, findEditionPrice, findStockPrice, cardPageUrl } from './ligamagic.js';
+import { fetchLigaData, findEditionPrice, findStockPrice, cardPageUrl,
+  defaultHtmlFetch, setHtmlFetcher } from './ligamagic.js';
 
 const THROTTLE_MS = 700;       // intervalo mínimo entre fetches reais à Liga
 const RETRY_DELAYS = [2000, 5000, 12000]; // backoff para 403/429/erro de rede (recupera burst)
@@ -12,6 +13,93 @@ const inflight = new Map();
 const stockRefetchTried = new Set();
 let lastFetchAt = 0;
 let fetchChain = Promise.resolve(); // serializa os fetches reais (throttle)
+
+// ===== Estratégia de fetch da Liga: SW direto, com fallback por aba first-party =====
+// Alguns navegadores (bloqueio de cookies de terceiros) não mandam o cf_clearance no
+// fetch do service worker → Cloudflare responde 403. Nesse caso, roteamos o fetch por
+// uma aba ligamagic.com.br (mesmo-origem: carrega o cookie e não sofre CORS). Uma vez
+// detectado o bloqueio, preferimos o relay direto no resto da sessão (evita 403s extras).
+let preferRelay = false;
+let ligaTabId = null;
+let ligaTabCreating = null;
+
+async function smartFetchHtml(url) {
+  if (!preferRelay) {
+    try {
+      return await defaultHtmlFetch(url);
+    } catch (e) {
+      // 404/429/5xx = erro real (não é bloqueio de contexto) → deixa o retry/cascata tratar.
+      // 403 ou erro de rede sem status → tenta a aba first-party.
+      if (e.status && e.status !== 403) throw e;
+      const text = await relayViaLigaTab(url);
+      if (text != null) { preferRelay = true; return text; }
+      throw e;
+    }
+  }
+
+  // Sessão já sabidamente bloqueada no SW: vai direto no relay.
+  const text = await relayViaLigaTab(url);
+  if (text != null) return text;
+  // Relay indisponível (aba fechada?) → tenta o SW como último recurso.
+  preferRelay = false;
+  return defaultHtmlFetch(url);
+}
+
+async function relayViaLigaTab(url) {
+  let tabId;
+  try { tabId = await ensureLigaTab(); } catch (_) { return null; }
+  if (tabId == null) return null;
+  try {
+    const res = await chrome.tabs.sendMessage(tabId, { type: 'ligaFetchRelay', url });
+    if (res && res.ok && typeof res.text === 'string') return res.text;
+  } catch (_) {
+    ligaTabId = null; // aba fechada / sem content script → recria na próxima
+  }
+  return null;
+}
+
+async function ensureLigaTab() {
+  // Reusa qualquer aba já aberta na LigaMagic
+  try {
+    const tabs = await chrome.tabs.query({ url: 'https://www.ligamagic.com.br/*' });
+    if (tabs.length) { ligaTabId = tabs[0].id; return ligaTabId; }
+  } catch (_) {}
+
+  // Reusa a aba de fundo criada antes, se ainda existir
+  if (ligaTabId != null) {
+    try { await chrome.tabs.get(ligaTabId); return ligaTabId; }
+    catch (_) { ligaTabId = null; }
+  }
+
+  // Cria uma aba de fundo (inativa): passa o Cloudflare como navegação real e vira
+  // nossa ponte first-party. Guard para não criar várias em paralelo.
+  if (!ligaTabCreating) {
+    ligaTabCreating = (async () => {
+      const tab = await chrome.tabs.create({ url: 'https://www.ligamagic.com.br/', active: false });
+      ligaTabId = tab.id;
+      await waitTabComplete(tab.id, 20000);
+      return ligaTabId;
+    })().finally(() => { ligaTabCreating = null; });
+  }
+  return ligaTabCreating;
+}
+
+function waitTabComplete(tabId, timeoutMs) {
+  return new Promise(resolve => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    };
+    const listener = (id, info) => { if (id === tabId && info.status === 'complete') finish(); };
+    chrome.tabs.onUpdated.addListener(listener);
+    setTimeout(finish, timeoutMs);
+  });
+}
+
+setHtmlFetcher(smartFetchHtml);
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'getPrice') {

@@ -1,6 +1,22 @@
 // IIFE: content script roda como script clássico — `return` no top-level é
 // SyntaxError ("Illegal return statement"). Envolver permite o early-return.
 (() => {
+// Relay de fetch da LigaMagic (first-party). O service worker pede que ESTA aba busque
+// a página da carta. Como roda em ligamagic.com.br, o fetch é mesmo-origem → carrega o
+// cookie cf_clearance do Cloudflare e não sofre CORS. Contorna o HTTP 403 que o SW leva
+// quando o navegador bloqueia cookies de terceiros no contexto do worker.
+// Registrado em TODA página da Liga (fora do guard de view=dks/novo).
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if(!msg || msg.type !== 'ligaFetchRelay') return;
+    fetch(msg.url, {
+        credentials: 'include',
+        headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+    })
+        .then(async r => sendResponse({ ok: r.ok, status: r.status, text: r.ok ? await r.text() : null }))
+        .catch(e => sendResponse({ ok: false, status: 0, error: String((e && e.message) || e) }));
+    return true; // resposta assíncrona
+});
+
 if(!location.search.includes('view=dks/novo')) return;
 
 chrome.storage.local.get('liga_export_pending', ({liga_export_pending: data}) => {

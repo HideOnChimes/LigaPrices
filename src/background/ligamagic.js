@@ -129,7 +129,8 @@ async function fetchPtName(editionCode, collectorNumber, fallbackEnName) {
   return null;
 }
 
-async function fetchHtml(url) {
+// Fetch padrão (contexto do service worker). Lança Error com .status em erro HTTP.
+export async function defaultHtmlFetch(url) {
   const resp = await fetch(url, {
     credentials: 'include',
     headers: {
@@ -145,6 +146,15 @@ async function fetchHtml(url) {
   }
 
   return resp.text();
+}
+
+// Fetcher injetável: o worker troca por uma estratégia SW→relay (aba first-party)
+// para contornar o 403 de Cloudflare quando o fetch do SW não leva o cf_clearance.
+let htmlFetcher = defaultHtmlFetch;
+export function setHtmlFetcher(fn) { htmlFetcher = fn || defaultHtmlFetch; }
+
+function fetchHtml(url) {
+  return htmlFetcher(url);
 }
 
 function parseEditions(html, name) {
