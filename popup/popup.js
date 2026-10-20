@@ -4,6 +4,7 @@ const statsEl = document.getElementById('stats');
 const refreshBtn = document.getElementById('refresh');
 const clearBtn = document.getElementById('clearCache');
 const statusEl = document.getElementById('status');
+const ligaStatusEl = document.getElementById('ligaStatus');
 
 const qualityBoxes = Array.from(
   document.querySelectorAll('#qualityBoxes input[type=checkbox]')
@@ -14,26 +15,28 @@ const stateBoxes = Array.from(
 );
 
 // Carrega configurações
-chrome.storage.local.get(['enabled', 'priceType', 'qualityFilter', 'stateFilter'], (cfg) => {
+chrome.storage.local.get(['enabled', 'priceType'], (cfg) => {
   enabledToggle.checked = cfg.enabled !== false;
   priceTypeSelect.value = cfg.priceType || 'p';
-
-  // Sem filtro salvo (ou vazio) = todas as qualidades
-  const selQ = Array.isArray(cfg.qualityFilter) && cfg.qualityFilter.length
-    ? cfg.qualityFilter
-    : [1, 2, 3, 4, 5, 6];
-  qualityBoxes.forEach(box => {
-    box.checked = selQ.includes(parseInt(box.dataset.q, 10));
-  });
-
-  // Sem filtro de estado salvo (ou vazio) = todos os estados
-  const selUF = Array.isArray(cfg.stateFilter) && cfg.stateFilter.length
-    ? cfg.stateFilter
-    : null; // null = todos
-  stateBoxes.forEach(box => {
-    box.checked = selUF === null || selUF.includes(box.dataset.uf);
-  });
 });
+
+// Filtro das listagens: um objeto só (ligaFiltros), o mesmo que a dashboard de estoque edita.
+// O popup mostra qualidade e UF; os outros grupos (idioma, extras, tipo de loja...) ficam no
+// catálogo da loja e valem aqui também.
+let filtros = { qualidades: [], estados: [] };
+function mostrarFiltros(f) {
+  filtros = f || filtros;
+  const selQ = filtros.qualidades.length ? filtros.qualidades : [1, 2, 3, 4, 5, 6];
+  qualityBoxes.forEach(box => { box.checked = selQ.includes(parseInt(box.dataset.q, 10)); });
+  stateBoxes.forEach(box => { box.checked = !filtros.estados.length || filtros.estados.includes(box.dataset.uf); });
+}
+async function gravarFiltros(patch) {
+  const s = await chrome.runtime.sendMessage({ type: 'setFilters', filtros: { ...filtros, ...patch } });
+  if (s && s.ok) mostrarFiltros(s.filtros);
+  sendToActiveTab({ type: 'refresh' });
+  setTimeout(loadStats, 1500);
+  loadLigaStatus();
+}
 
 // Toggle ligado/desligado — content script reage via storage.onChanged
 enabledToggle.addEventListener('change', () => {
@@ -48,34 +51,22 @@ priceTypeSelect.addEventListener('change', () => {
   });
 });
 
-// Filtro de qualidade — salva e re-renderiza (re-filtra o cache, sem rede)
+// Filtro de qualidade — grava e re-renderiza (re-filtra o cache, sem rede)
 qualityBoxes.forEach(box => {
   box.addEventListener('change', () => {
-    const qualityFilter = qualityBoxes
-      .filter(b => b.checked)
-      .map(b => parseInt(b.dataset.q, 10));
-    chrome.storage.local.set({ qualityFilter }, () => {
-      sendToActiveTab({ type: 'refresh' });
-      flash(qualityFilter.length === 0
-        ? 'Nenhuma qualidade marcada = todas.'
-        : 'Filtro de qualidade atualizado.');
-      setTimeout(loadStats, 1500);
-    });
+    const qualidades = qualityBoxes.filter(b => b.checked).map(b => parseInt(b.dataset.q, 10));
+    flash(qualidades.length === 0 ? 'Nenhuma qualidade marcada = todas.' : 'Filtro de qualidade atualizado.');
+    gravarFiltros({ qualidades });
   });
 });
 
-// Filtro de estado — salva e re-renderiza
+// Filtro de estado — grava e re-renderiza
 function saveStateFilter() {
   const checked = stateBoxes.filter(b => b.checked).map(b => b.dataset.uf);
   // Todos marcados = array vazio (sem filtro); subconjunto = array dos UFs selecionados
-  const stateFilter = checked.length === stateBoxes.length ? [] : checked;
-  chrome.storage.local.set({ stateFilter }, () => {
-    sendToActiveTab({ type: 'refresh' });
-    flash(stateFilter.length === 0
-      ? 'Todos os estados selecionados.'
-      : `Filtrando por ${stateFilter.length} estado(s).`);
-    setTimeout(loadStats, 1500);
-  });
+  const estados = checked.length === stateBoxes.length ? [] : checked;
+  flash(estados.length === 0 ? 'Todos os estados selecionados.' : `Filtrando por ${estados.length} estado(s).`);
+  gravarFiltros({ estados });
 }
 
 stateBoxes.forEach(box => {
@@ -90,6 +81,11 @@ document.getElementById('stateAll').addEventListener('click', () => {
 document.getElementById('stateNone').addEventListener('click', () => {
   stateBoxes.forEach(b => { b.checked = false; });
   saveStateFilter();
+});
+
+document.getElementById('clearFilters').addEventListener('click', () => {
+  flash('Filtros limpos.');
+  gravarFiltros({ qualidades: [], estados: [], idiomas: [], extras: [], tiposLoja: [], avaliacoes: [], envio: [], quantidade: 0, graduadas: [] });
 });
 
 refreshBtn.addEventListener('click', async () => {
@@ -177,4 +173,29 @@ function flash(text) {
   setTimeout(() => { statusEl.textContent = ''; }, 2500);
 }
 
+// Uso da LigaMagic hoje (contador, fila, intervalo, pausa do disjuntor, cache)
+async function loadLigaStatus() {
+  try {
+    const s = await chrome.runtime.sendMessage({ type: 'getStatus' });
+    if (!s || !s.ok) return;
+    const hhmm = ts => new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const fila = s.queued ? ` · fila: ${s.queued}` : '';
+    const intervalo = (s.spacing / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    let html = `<div>LigaMagic hoje: <span class="ok">${s.today}</span> cartas buscadas · ${s.cached} no cache${fila} · ${intervalo} s entre buscas</div>`;
+    if (s.filtros) {
+      mostrarFiltros(s.filtros);
+      const f = s.filtros;
+      const outros = [f.idiomas, f.extras, f.tiposLoja, f.avaliacoes, f.envio, f.graduadas].filter(l => l.length).length + (f.quantidade ? 1 : 0);
+      if (outros) html += `<div><span class="approx">${outros}</span> filtro(s) de idioma/extras/loja ativos (editar no catálogo da loja)</div>`;
+    }
+    if (s.pausedUntil) {
+      html += `<div><span class="approx">⏸ pausada até ${hhmm(s.pausedUntil)}</span> (a Liga recusou as últimas buscas)</div>`;
+    }
+    ligaStatusEl.innerHTML = html;
+  } catch (e) {
+    ligaStatusEl.innerHTML = '<em>Não foi possível ler o uso da LigaMagic.</em>';
+  }
+}
+
 loadStats();
+loadLigaStatus();

@@ -1,9 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "LigaMagic Prices for Archidekt",
-  "version": "1.8.0",
-  "description": "Mostra preços da LigaMagic.com.br em decks do Archidekt, por edição e arte exata.",
-  "permissions": ["storage", "unlimitedStorage"],
+  "name": "LigaMagic Prices",
+  "version": "1.11.0",
+  "description": "Preços da LigaMagic.com.br em decks do Archidekt e no estoque da sua loja, por edição e arte exata.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
   "host_permissions": [
     "https://www.ligamagic.com.br/*",
     "https://api.scryfall.com/cards/*",
@@ -15,21 +18,46 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://archidekt.com/*"],
-      "js": ["src/content/archidekt.js"],
-      "css": ["src/content/archidekt.css"],
+      "matches": [
+        "https://archidekt.com/*"
+      ],
+      "js": [
+        "src/content/archidekt.js"
+      ],
+      "css": [
+        "src/content/archidekt.css"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://www.ligamagic.com.br/*"],
-      "js": ["src/content/ligamagic-import.js"],
+      "matches": [
+        "https://www.ligamagic.com.br/*"
+      ],
+      "js": [
+        "src/content/ligamagic-import.js"
+      ],
       "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://tcg-data-base.vercel.app/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "src/content/estoque-bridge.js"
+      ],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/icons/*"],
-      "matches": ["https://archidekt.com/*"]
+      "resources": [
+        "assets/icons/*"
+      ],
+      "matches": [
+        "https://archidekt.com/*"
+      ]
     }
   ],
   "options_page": "popup/popup.html",

@@ -54,7 +54,6 @@ chrome.storage.local.get('liga_export_pending', ({liga_export_pending: data}) =>
                 formatField.value = val;
                 formatField.dispatchEvent(new Event('change', {bubbles: true}));
             }
-            console.log('[Liga import] data.format:', JSON.stringify(data.format), 'val:', FORMAT_MAP[data.format.toLowerCase().trim()]);
 
         }
         

@@ -1,14 +1,23 @@
 == COMO INSTALAR ==
 
-1. Abra o Chrome e acesse: chrome://extensions
+1. Abra o Chrome (ou Edge) e acesse: chrome://extensions
 2. Ative o "Modo do desenvolvedor" (canto superior direito)
 3. Clique em "Carregar sem compactação" (Load unpacked)
-4. Selecione a pasta: archidekt-ligamagic-extension
-5. A extensão aparecerá na lista com o ícone verde "L"
+4. Selecione a pasta do projeto (a que tem o manifest.json)
+5. A extensão aparecerá na lista com o ícone da Liga
 
-== COMO USAR ==
+== ONDE FUNCIONA ==
 
-1. Acesse qualquer deck no Archidekt: https://archidekt.com/decks/...
+- Archidekt: https://archidekt.com/decks/... (preços em R$ ao lado de cada carta + total do deck)
+- Estoque da loja (dashboard): o catálogo pede os preços da Liga para a extensão.
+  A página conversa com a extensão por window.postMessage (src/content/estoque-bridge.js).
+  O manifest libera https://tcg-data-base.vercel.app, http://localhost e http://127.0.0.1
+  (qualquer porta). Se a dashboard ganhar domínio próprio, acrescente "https://SEU-DOMINIO/*"
+  em content_scripts → matches do estoque-bridge e recarregue a extensão.
+
+== COMO USAR (ARCHIDEKT) ==
+
+1. Acesse qualquer deck no Archidekt
 2. Os preços em R$ da LigaMagic aparecem automaticamente ao lado dos preços em $ de cada carta
 3. O total do deck em R$ aparece no header do deck
 4. Preços com "~" são aproximados (edição/arte exata não encontrada na Liga)
@@ -19,11 +28,25 @@
 Clique no ícone da extensão na barra do Chrome:
 - Liga/desliga os preços sem desinstalar
 - Tipo de preço: menor (padrão), médio ou maior
+- Uso de hoje: cartas buscadas, quantas no cache, tamanho da fila, intervalo entre buscas,
+  se está pausada
+- Qualidade / Estado das lojas: vale no Archidekt e no estoque. A dashboard tem esses e
+  os outros filtros da Liga (idioma, extras, tipo de loja, avaliação, envio, quantidade,
+  graduação) mais cidade da loja, num painel no catálogo; é uma configuração só
+  (ligaFiltros), mudar em um lugar muda no outro. "Limpar filtros" zera tudo.
+  A lista de cidades vem das lojas das cartas já buscadas (cards_stores da página).
+- Recarregou/atualizou a extensão com a dashboard aberta? Dê F5 na página: o Chrome não
+  reinjeta a ponte em abas que já estavam abertas
 - Estatísticas do deck aberto (quantas cartas com preço, aproximadas, não encontradas)
 - Atualizar preços da página / limpar cache
 
 == NOTAS ==
 
-- Preços são cacheados por 24h para não sobrecarregar a LigaMagic
+- Uma busca real por carta; o preço fica no cache até a Liga recalcular (todo dia entre
+  02:00 e 04:00) ou por 24 h, o que vier antes.
+- Não há limite de cartas por dia: as buscas entram numa fila e saem uma por vez, com
+  1,5 s entre elas. Se a Liga responder 403/429 o intervalo dobra (até 10 s) e volta
+  devagar quando normaliza.
+- Se a Liga recusar as buscas (403/429) a extensão pausa por 15 minutos antes de tentar de novo.
 - O matching é feito por edição + número do card = impressão exata
 - Cartas foil buscam o preço foil quando disponível

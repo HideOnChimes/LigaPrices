@@ -6,45 +6,41 @@
 // Algumas linhas (promoções) trazem o preço em claro em precoFinal.
 
 import { GLYPH_DICT, GLYPH_W, GLYPH_H } from './glyphdict.js';
+import { extractJsonArray, extractJsonObject, decodeEntities } from '../common/html.js';
+import { chaveCidade } from '../common/filtros.js';
+
+// `var cards_stores = { "<lj_id>": { lj_name, lj_cidade, lj_uf, lj_selo, ... } }` da página.
+// Devolve:
+//   porId:   Map(lj_id → { c: chave da cidade, selo })
+//   cidades: [{ uf, nome, chave }] distintas
+//   lojas:   [{ id, nome, uf, cidade, selo }] (para "ignorar estas lojas" / "só estas lojas")
+export function parseStores(html) {
+  const obj = extractJsonObject(html, 'cards_stores');
+  const porId = new Map();
+  const vistas = new Map();
+  const lojas = [];
+  if (obj) {
+    for (const [id, loja] of Object.entries(obj)) {
+      if (!loja || typeof loja !== 'object') continue;
+      const cidade = decodeEntities(loja.lj_cidade).trim();
+      const uf = String(loja.lj_uf || '').toUpperCase();
+      const chave = chaveCidade(uf, cidade);
+      const selo = Number(loja.lj_selo) || 0;
+      porId.set(String(id), { c: chave, selo });
+      if (chave && !vistas.has(chave)) vistas.set(chave, { uf, nome: cidade, chave });
+      const nome = decodeEntities(loja.lj_name).trim();
+      if (nome) lojas.push({ id: Number(id), nome, uf, cidade, selo });
+    }
+  }
+  return {
+    porId,
+    cidades: [...vistas.values()].sort((a, b) => a.uf.localeCompare(b.uf) || a.nome.localeCompare(b.nome)),
+    lojas: lojas.sort((a, b) => a.nome.localeCompare(b.nome)),
+  };
+}
 
 const DICT_ENTRIES = Object.entries(GLYPH_DICT);
 
-// Extrai e parseia um array JSON inline: var <varName> = [...];
-// Parse balanceado de colchetes evita corte prematuro em ]; dentro de strings.
-function extractJsonArray(html, varName) {
-  const re = new RegExp('var\\s+' + varName + '\\s*=\\s*(\\[)');
-  const start = re.exec(html);
-  if (!start) return null;
-
-  let depth = 0;
-  let inStr = false;
-  let strChar = '';
-  let i = start.index + start[0].length - 1; // posição do '['
-
-  for (; i < html.length; i++) {
-    const ch = html[i];
-    if (inStr) {
-      if (ch === '\\') { i++; continue; } // escape
-      if (ch === strChar) inStr = false;
-    } else if (ch === '"' || ch === "'") {
-      inStr = true;
-      strChar = ch;
-    } else if (ch === '[') {
-      depth++;
-    } else if (ch === ']') {
-      depth--;
-      if (depth === 0) {
-        try {
-          const parsed = JSON.parse(html.slice(start.index + start[0].length - 1, i + 1));
-          return parsed.length ? parsed : null;
-        } catch (_) {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
-}
 const HAMMING_MAX = 10;       // tolerância p/ variantes de glifo não catalogadas
 const MIN_DECODE_RATIO = 0.5; // abaixo disso, pool de glifos provavelmente mudou
 
@@ -60,6 +56,7 @@ export async function decodeStockFromHtml(html) {
 
     const maps = parseCssMaps(html);
     const sprites = await fetchSprites(maps.spriteUrls);
+    const lojas = parseStores(html).porId;
 
     const rows = [];
     let cssTotal = 0;
@@ -84,7 +81,17 @@ export async function decodeStockFromHtml(html) {
         x: Number(raw.extras) || 0,
         l: Number(raw.idioma) || 0,
         u: raw.lj_uf || '',
+        c: lojas.get(String(raw.lj_id))?.c || '',
+        s: Number(raw.lj_id) || 0,
+        se: lojas.get(String(raw.lj_id))?.selo || 0,
+        pv: raw.prevEnvio != null && String(raw.prevEnvio).trim() !== '' ? 1 : 0, // pré-venda
         p: price,
+        // campos dos outros filtros da Liga (ver common/filtros.js)
+        t: Number(raw.lj_tipo) || 0,
+        r: Number(raw.lj_ref) || 0,
+        d: Number(raw.lj_rastreio) || 0,
+        qt: Number(raw.quantFilter) || 0,
+        g: Number(raw.is_graded) || 0,
       });
     }
 

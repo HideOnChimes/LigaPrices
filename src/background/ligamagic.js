@@ -1,7 +1,9 @@
 // Fetch e parse da página de carta da LigaMagic
 // Extrai window.cards_editions do HTML inline
 
-import { decodeStockFromHtml, getFoilExtraIds } from './pricedecode.js';
+import { decodeStockFromHtml, getFoilExtraIds, parseStores } from './pricedecode.js';
+import { extractJsonArray } from '../common/html.js';
+import { acabamento, passa } from '../common/filtros.js';
 
 const LIGA_ORIGIN = 'https://www.ligamagic.com.br';
 const CARD_VIEW = LIGA_ORIGIN + '/?view=cards/card&card=';
@@ -29,7 +31,9 @@ export async function fetchLigaData(cardName, editionCode, collectorNumber) {
 
   const stock = await decodeStockFromHtml(html);
   const foilIds = getFoilExtraIds(html);
-  return { editions, stock, foilIds };
+  // cidades e lojas que vendem esta carta (alimentam os filtros de cidade/loja na dashboard)
+  const { cidades, lojas } = parseStores(html);
+  return { editions, stock, foilIds, cidades, lojas };
 }
 
 // Devolve o HTML da página de carta que contém cards_editions, ou null.
@@ -54,11 +58,14 @@ async function fetchCardPageHtml(cardName, editionCode, collectorNumber) {
   };
 
   // Retorna html se tiver editions com a impressão exata; senão guarda como fallback.
+  // Sem edição/número (dashboard de estoque pede a carta inteira): a primeira página com
+  // editions já serve — não vale gastar mais requests procurando uma impressão.
   const consider = (html, name) => {
     if (!html) return null;
     const editions = parseEditions(html, name);
     if (!editions) return null;
     if (!fallback) fallback = html;
+    if (!editionCode && !collectorNumber) return html;
     const match = findEditionEntry(editions, editionCode, collectorNumber);
     if (match && !match.approximate) return html; // impressão exata → melhor página
     return null;
@@ -276,43 +283,6 @@ function findCardLinkInSearch(html, frontName) {
   return firstUrl;
 }
 
-// Extrai e parseia um array JSON inline: var <varName> = [...];
-// Parse balanceado de colchetes evita corte prematuro em ]; dentro de strings.
-function extractJsonArray(html, varName) {
-  const re = new RegExp('var\\s+' + varName + '\\s*=\\s*(\\[)');
-  const start = re.exec(html);
-  if (!start) return null;
-
-  let depth = 0;
-  let inStr = false;
-  let strChar = '';
-  let i = start.index + start[0].length - 1; // posição do '['
-
-  for (; i < html.length; i++) {
-    const ch = html[i];
-    if (inStr) {
-      if (ch === '\\') { i++; continue; } // escape
-      if (ch === strChar) inStr = false;
-    } else if (ch === '"' || ch === "'") {
-      inStr = true;
-      strChar = ch;
-    } else if (ch === '[') {
-      depth++;
-    } else if (ch === ']') {
-      depth--;
-      if (depth === 0) {
-        try {
-          const parsed = JSON.parse(html.slice(start.index + start[0].length - 1, i + 1));
-          return parsed.length ? parsed : null;
-        } catch (_) {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
-}
-
 const normNum = n => String(n).replace(/^0+/, '').toLowerCase();
 
 // Acha a entrada de edição correspondente à impressão (cascata de matching).
@@ -373,11 +343,12 @@ export function findEditionPrice(editions, editionCode, collectorNumber, priceKe
   return { price: cheap.price, approximate: true, editionId: cheap.entry.id };
 }
 
-// Menor/médio/maior preço entre as listagens decodificadas que casam com a
-// impressão, o foil e as qualidades selecionadas (qualSet = Set de 1..6).
+// Menor/médio/maior preço entre as listagens decodificadas que casam com a impressão, o foil
+// e o filtro. `filtro` (common/filtros.js) é o caminho atual; qualSet/stateSet ficam como
+// compatibilidade (qualSet = Set de 1..6, stateSet = Set de UFs).
 // Retorna { value, approximate, editionId } ou null (sem listagem compatível).
 export function findStockPrice(stock, editions, editionCode, collectorNumber,
-                               foil, qualSet, priceKey, foilIds, stateSet = null) {
+                               foil, qualSet, priceKey, foilIds, stateSet = null, filtro = null) {
   if (!stock || !stock.length) return null;
 
   const match = findEditionEntry(editions, editionCode, collectorNumber);
@@ -392,11 +363,11 @@ export function findStockPrice(stock, editions, editionCode, collectorNumber,
     if (byNum.length) rows = byNum;
   }
 
-  const isFoil = ids => foilIds.includes(ids);
+  // extras é um produto de ids (26 = Foil + Textless ainda é foil): decide por acabamento()
+  const ehFoil = r => acabamento(r.x, foilIds) !== 'normal';
   rows = rows.filter(r =>
-    (foil ? isFoil(r.x) : !isFoil(r.x)) &&
-    qualSet.has(r.q) &&
-    (!stateSet || stateSet.has(r.u))
+    (foil ? ehFoil(r) : !ehFoil(r)) &&
+    (filtro ? passa(r, filtro) : (!qualSet || qualSet.has(r.q)) && (!stateSet || stateSet.has(r.u)))
   );
   if (!rows.length) return null;
 
