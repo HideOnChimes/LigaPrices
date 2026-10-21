@@ -75,3 +75,7 @@ export async function setPaused(until) {
   const m = await getMeta();
   await chrome.storage.local.set({ [META_KEY]: { day: m.day, count: m.count, pausedUntil: until } });
 }
+
+export async function clearPaused() {
+  await setPaused(null);
+}
