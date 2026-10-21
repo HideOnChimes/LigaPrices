@@ -193,6 +193,10 @@ async function loadLigaStatus() {
         ` <button class="btn-mini" id="resume">Retomar agora</button>` +
         ` <button class="btn-mini" id="abrirLiga">Abrir Liga</button></div>`;
     }
+    if (s.ultimoErro) {
+      const e = s.ultimoErro;
+      html += `<div class="approx">Último erro (${hhmm(e.quando)}, ${escapeHtml(e.carta)}): ${escapeHtml(e.detalhe)}</div>`;
+    }
     ligaStatusEl.innerHTML = html;
     const abrirBtn = document.getElementById('abrirLiga');
     if (abrirBtn) {
