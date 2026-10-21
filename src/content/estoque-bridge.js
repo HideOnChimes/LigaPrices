@@ -25,7 +25,7 @@
       } else if (m.type === 'status') {
         res = await chrome.runtime.sendMessage({ type: 'getStatus' });
       } else if (m.type === 'editions') {
-        res = await chrome.runtime.sendMessage({ type: 'getEditions', cardName: String(m.cardName || '') });
+        res = await chrome.runtime.sendMessage({ type: 'getEditions', cardName: String(m.cardName || ''), filtros: m.filtros && typeof m.filtros === 'object' ? m.filtros : undefined });
       } else if (m.type === 'setFilters') {
         res = await chrome.runtime.sendMessage({ type: 'setFilters', filtros: m.filtros });
       } else {

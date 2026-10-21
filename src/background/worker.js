@@ -307,10 +307,16 @@ async function setFilters({ filtros }) {
 // (cards_editions) + quando foram buscadas. Quem casa edição/número é a dashboard.
 // Com filtro de qualidade/estado ativo, manda também os preços por edição calculados só
 // das listagens que passam no filtro (precosFiltrados).
-async function getEditions({ cardName }) {
+// filtros (opcional): filtro só para este pedido, no lugar do gravado no popup. A dashboard usa
+// quando uma regra de preço pede a Liga de outro jeito (ex.: só lojas de MG, só NM).
+async function getEditions({ cardName, filtros }) {
   const name = String(cardName || '').trim();
   if (!name) return { ok: false, error: 'Nome da carta vazio' };
-  const filters = await readFilters();
+  let filters = await readFilters();
+  if (filtros && typeof filtros === 'object') {
+    const filtro = normalizar(filtros);
+    filters = { priceType: filters.priceType, filtro, isFiltering: ativo(filtro) };
+  }
   const loaded = await loadEntry(name, '', '', filters.isFiltering);
   if (loaded.status !== 'ok') return { ok: false, ...statusError(loaded) };
   return {
