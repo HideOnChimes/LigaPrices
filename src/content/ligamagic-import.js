@@ -17,6 +17,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true; // resposta assíncrona
 });
 
+// Página da Liga vista pelo lojista (aba visível; a aba de fundo do relay também conta quando
+// ele a traz pra frente) e que não é o desafio do Cloudflare → avisa o worker pra tirar a
+// pausa do disjuntor, se houver.
+const avisarVisita = () => {
+    if(document.visibilityState !== 'visible' || /just a moment|um momento/i.test(document.title)) return;
+    chrome.runtime.sendMessage({ type: 'ligaVisitada' }).catch(() => {});
+};
+avisarVisita();
+document.addEventListener('visibilitychange', avisarVisita);
+
 if(!location.search.includes('view=dks/novo')) return;
 
 chrome.storage.local.get('liga_export_pending', ({liga_export_pending: data}) => {

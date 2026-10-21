@@ -189,9 +189,23 @@ async function loadLigaStatus() {
       if (outros) html += `<div><span class="approx">${outros}</span> filtro(s) de idioma/extras/loja ativos (editar no catálogo da loja)</div>`;
     }
     if (s.pausedUntil) {
-      html += `<div><span class="approx">⏸ pausada até ${hhmm(s.pausedUntil)}</span> (a Liga recusou as últimas buscas)</div>`;
+      html += `<div><span class="approx">⏸ pausada até ${hhmm(s.pausedUntil)}</span> (a Liga recusou as últimas buscas)` +
+        ` <button class="btn-mini" id="resume">Retomar agora</button>` +
+        ` <button class="btn-mini" id="abrirLiga">Abrir Liga</button></div>`;
     }
     ligaStatusEl.innerHTML = html;
+    const abrirBtn = document.getElementById('abrirLiga');
+    if (abrirBtn) {
+      abrirBtn.addEventListener('click', () => chrome.runtime.sendMessage({ type: 'abrirLiga' }));
+    }
+    const resumeBtn = document.getElementById('resume');
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', async () => {
+        await chrome.runtime.sendMessage({ type: 'resume' });
+        flash('Buscas retomadas');
+        loadLigaStatus();
+      });
+    }
   } catch (e) {
     ligaStatusEl.innerHTML = '<em>Não foi possível ler o uso da LigaMagic.</em>';
   }

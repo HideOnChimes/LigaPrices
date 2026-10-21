@@ -1,4 +1,4 @@
-import { getCachedEntry, setCached, cacheKey, getMeta, bumpToday, setPaused } from '../common/storage.js';
+import { getCachedEntry, setCached, cacheKey, getMeta, bumpToday, setPaused, clearPaused } from '../common/storage.js';
 import { fetchLigaData, findEditionPrice, findStockPrice, cardPageUrl,
   defaultHtmlFetch, setHtmlFetcher } from './ligamagic.js';
 import { normalizar, ativo, passa, acabamento, chaveCidade } from '../common/filtros.js';
@@ -120,7 +120,32 @@ const HANDLERS = {
   getStatus,
   setFilters,
   clearCache: async () => { await clearPriceCache(); return { ok: true }; },
+  resume: async () => { await retomar(); return { ok: true }; },
+  // Lojista abriu a Liga numa aba visível e a página carregou (passou o Cloudflare): o
+  // cf_clearance está renovado, então a pausa do disjuntor não faz mais sentido.
+  ligaVisitada: async () => {
+    if ((await getMeta()).pausedUntil) await retomar();
+    return { ok: true };
+  },
+  abrirLiga,
 };
+
+// Traz a aba da Liga (a de fundo do relay, se existir) pra frente. O desafio do Cloudflare
+// às vezes não termina numa aba oculta (o navegador desacelera abas em segundo plano); com
+// a aba visível ele passa, e o content script avisa `ligaVisitada`, que tira a pausa.
+async function abrirLiga() {
+  const tabId = await ensureLigaTab();
+  if (tabId == null) return { ok: false, error: 'não consegui abrir a LigaMagic' };
+  const tab = await chrome.tabs.update(tabId, { active: true });
+  if (tab && tab.windowId != null) await chrome.windows.update(tab.windowId, { focused: true });
+  return { ok: true };
+}
+
+// Tira a pausa do disjuntor e volta o intervalo pro mínimo.
+async function retomar() {
+  await clearPaused();
+  spacing = BASE_SPACING_MS;
+}
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const handler = msg && HANDLERS[msg.type];
