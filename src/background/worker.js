@@ -34,6 +34,11 @@ let preferRelay = false;
 let ligaTabId = null;
 let ligaTabCreating = null;
 
+// Último erro de busca (rota direta e relay), mostrado no popup pra diagnosticar navegador.
+let ultimoErro = null;
+// Resultado da última tentativa de relay, pra compor ultimoErro: 'ok', 'sem aba', 'HTTP 403'...
+let ultimoRelay = null;
+
 async function smartFetchHtml(url) {
   if (!preferRelay) {
     try {
@@ -41,9 +46,10 @@ async function smartFetchHtml(url) {
     } catch (e) {
       // 404/429/5xx = erro real (não é bloqueio de contexto) → deixa o retry/cascata tratar.
       // 403 ou erro de rede sem status → tenta a aba first-party.
-      if (e.status && e.status !== 403) throw e;
+      if (e.status && e.status !== 403) { e.rota = 'direto'; throw e; }
       const text = await relayViaLigaTab(url);
       if (text != null) { preferRelay = true; return text; }
+      e.rota = `direto ${e.status ? 'HTTP ' + e.status : 'sem resposta'}; aba da Liga: ${ultimoRelay}`;
       throw e;
     }
   }
@@ -53,18 +59,44 @@ async function smartFetchHtml(url) {
   if (text != null) return text;
   // Relay indisponível (aba fechada?) → tenta o SW como último recurso.
   preferRelay = false;
-  return defaultHtmlFetch(url);
+  try {
+    return await defaultHtmlFetch(url);
+  } catch (e) {
+    e.rota = `aba da Liga: ${ultimoRelay}; direto ${e.status ? 'HTTP ' + e.status : 'sem resposta'}`;
+    throw e;
+  }
 }
 
+// Busca a página DENTRO da aba da Liga via chrome.scripting (mesmo-origem, leva o cookie do
+// Cloudflare). Não depende do content script: abas da Liga abertas antes de instalar/recarregar
+// a extensão não têm o content script, e o sendMessage pra elas falhava sempre (Helium, Vivaldi
+// e qualquer navegador onde o lojista já estava com a Liga aberta).
 async function relayViaLigaTab(url) {
   let tabId;
-  try { tabId = await ensureLigaTab(); } catch (_) { return null; }
-  if (tabId == null) return null;
+  try { tabId = await ensureLigaTab(); } catch (_) { tabId = null; }
+  if (tabId == null) { ultimoRelay = 'não consegui abrir'; return null; }
   try {
-    const res = await chrome.tabs.sendMessage(tabId, { type: 'ligaFetchRelay', url });
-    if (res && res.ok && typeof res.text === 'string') return res.text;
-  } catch (_) {
-    ligaTabId = null; // aba fechada / sem content script → recria na próxima
+    const [inj] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: async (u) => {
+        try {
+          const r = await fetch(u, {
+            credentials: 'include',
+            headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+          });
+          return { ok: r.ok, status: r.status, text: r.ok ? await r.text() : null };
+        } catch (e) {
+          return { ok: false, status: 0, error: String((e && e.message) || e) };
+        }
+      },
+      args: [url],
+    });
+    const res = inj && inj.result;
+    if (res && res.ok && typeof res.text === 'string') { ultimoRelay = 'ok'; return res.text; }
+    ultimoRelay = res ? (res.status ? 'HTTP ' + res.status : res.error || 'sem resposta') : 'sem resposta';
+  } catch (e) {
+    ultimoRelay = 'falhou (' + ((e && e.message) || e) + ')';
+    ligaTabId = null; // aba fechada/descartada → recria na próxima
   }
   return null;
 }
@@ -72,7 +104,8 @@ async function relayViaLigaTab(url) {
 async function ensureLigaTab() {
   // Reusa qualquer aba já aberta na LigaMagic
   try {
-    const tabs = await chrome.tabs.query({ url: 'https://www.ligamagic.com.br/*' });
+    // Aba descartada (economia de memória do navegador) não roda script: pula
+    const tabs = (await chrome.tabs.query({ url: 'https://www.ligamagic.com.br/*' })).filter(t => !t.discarded);
     if (tabs.length) { ligaTabId = tabs[0].id; return ligaTabId; }
   } catch (_) {}
 
@@ -256,6 +289,7 @@ async function getStatus() {
     queued,
     spacing,
     pausedUntil: meta.pausedUntil,
+    ultimoErro,
     filtros: (await readFilters()).filtro,
     cidades: idx.cidades,
     lojas,
@@ -604,8 +638,9 @@ async function fetchWithRetry(cardName, editionCode, collectorNumber) {
       await sleep(RETRY_DELAYS[attempt]);
     }
   }
-  console.warn('[LigaMagic] fetch falhou para', cardName, lastErr?.message,
+  console.warn('[LigaMagic] fetch falhou para', cardName, lastErr?.message, lastErr?.rota || '',
     '— pausando por', PAUSE_MS / 60000, 'min');
+  ultimoErro = { quando: Date.now(), carta: cardName, detalhe: lastErr?.rota || lastErr?.message || 'erro' };
   await setPaused(Date.now() + PAUSE_MS);
   return { transient: true };
 }
