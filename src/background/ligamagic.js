@@ -136,7 +136,29 @@ async function fetchPtName(editionCode, collectorNumber, fallbackEnName) {
   return null;
 }
 
-// Fetch padrão (contexto do service worker). Lança Error com .status em erro HTTP.
+// O que o Cloudflare (na frente da Liga) disse num HTTP de erro:
+//   'desafio'  → challenge (header cf-mitigated: challenge, ou página "Um momento..."). Um fetch
+//                não resolve; uma navegação real na aba resolve e grava o cf_clearance.
+//   'bloqueio' → IP barrado por enquanto ("Attention Required"); só esperar.
+//   null       → não parece Cloudflare (403 do próprio app, por exemplo).
+const CF_DESAFIO_RE = /just a moment|um momento|verifying you are human|verificando se voc/i;
+const CF_BLOQUEIO_RE = /attention required|aten[çc][ãa]o necess|access denied|acesso negado/i;
+export function tipoBloqueio(cfMitigated, titulo) {
+  if (cfMitigated === 'challenge' || CF_DESAFIO_RE.test(titulo || '')) return 'desafio';
+  if (cfMitigated === 'block' || CF_BLOQUEIO_RE.test(titulo || '')) return 'bloqueio';
+  return null;
+}
+export function rotuloBloqueio(tipo) {
+  if (tipo === 'desafio') return ' (desafio do Cloudflare)';
+  if (tipo === 'bloqueio') return ' (bloqueio do Cloudflare)';
+  return '';
+}
+export function tituloDoHtml(html) {
+  const m = /<title[^>]*>([^<]*)/i.exec(html || '');
+  return m ? m[1].trim() : '';
+}
+
+// Fetch padrão (contexto do service worker). Lança Error com .status (e .bloqueio) em erro HTTP.
 export async function defaultHtmlFetch(url) {
   const resp = await fetch(url, {
     credentials: 'include',
@@ -149,6 +171,9 @@ export async function defaultHtmlFetch(url) {
   if (!resp.ok) {
     const err = new Error(`Liga fetch falhou: HTTP ${resp.status}`);
     err.status = resp.status;
+    let titulo = '';
+    try { titulo = tituloDoHtml(await resp.text()); } catch (_) {}
+    err.bloqueio = tipoBloqueio(resp.headers.get('cf-mitigated'), titulo);
     throw err;
   }
 

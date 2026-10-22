@@ -1,6 +1,6 @@
 import { getCachedEntry, setCached, cacheKey, getMeta, bumpToday, setPaused, clearPaused } from '../common/storage.js';
 import { fetchLigaData, findEditionPrice, findStockPrice, cardPageUrl,
-  defaultHtmlFetch, setHtmlFetcher } from './ligamagic.js';
+  defaultHtmlFetch, setHtmlFetcher, tipoBloqueio, rotuloBloqueio } from './ligamagic.js';
 import { normalizar, ativo, passa, acabamento, chaveCidade } from '../common/filtros.js';
 
 // ===== Fila de buscas reais à Liga =====
@@ -33,11 +33,20 @@ let fetchChain = Promise.resolve(); // serializa os fetches reais (a fila)
 let preferRelay = false;
 let ligaTabId = null;
 let ligaTabCreating = null;
+// Aba de fundo que NÓS criamos (nunca a do lojista): é nela que navegamos pra resolver o
+// desafio do Cloudflare e que "Abrir Liga" traz pra frente.
+let nossaAbaId = null;
 
 // Último erro de busca (rota direta e relay), mostrado no popup pra diagnosticar navegador.
 let ultimoErro = null;
 // Resultado da última tentativa de relay, pra compor ultimoErro: 'ok', 'sem aba', 'HTTP 403'...
 let ultimoRelay = null;
+// Tipo de bloqueio visto na última tentativa de relay ('desafio' | 'bloqueio' | null).
+let ultimoRelayBloqueio = null;
+
+const LIGA_HOME = 'https://www.ligamagic.com.br/';
+const DESAFIO_INTERVALO_MS = 2 * 60 * 1000; // no máximo uma navegação de desafio a cada 2 min
+let ultimoDesafioAt = 0;
 
 async function smartFetchHtml(url) {
   if (!preferRelay) {
@@ -49,7 +58,12 @@ async function smartFetchHtml(url) {
       if (e.status && e.status !== 403) { e.rota = 'direto'; throw e; }
       const text = await relayViaLigaTab(url);
       if (text != null) { preferRelay = true; return text; }
-      e.rota = `direto ${e.status ? 'HTTP ' + e.status : 'sem resposta'}; aba da Liga: ${ultimoRelay}`;
+      // As duas rotas de fetch levaram 403: o Cloudflare está desafiando só requests de fetch
+      // (navegação passa). Navega a nossa aba até a página da carta pra resolver e tenta de novo.
+      const viaDesafio = await tentarDesafio(url, e.bloqueio || ultimoRelayBloqueio);
+      if (viaDesafio != null) { preferRelay = true; return viaDesafio; }
+      e.bloqueio = e.bloqueio || ultimoRelayBloqueio;
+      e.rota = `direto ${e.status ? 'HTTP ' + e.status : 'sem resposta'}${rotuloBloqueio(e.bloqueio)}; aba da Liga: ${ultimoRelay}`;
       throw e;
     }
   }
@@ -57,14 +71,91 @@ async function smartFetchHtml(url) {
   // Sessão já sabidamente bloqueada no SW: vai direto no relay.
   const text = await relayViaLigaTab(url);
   if (text != null) return text;
+  const viaDesafio = await tentarDesafio(url, ultimoRelayBloqueio);
+  if (viaDesafio != null) return viaDesafio;
   // Relay indisponível (aba fechada?) → tenta o SW como último recurso.
   preferRelay = false;
   try {
     return await defaultHtmlFetch(url);
   } catch (e) {
-    e.rota = `aba da Liga: ${ultimoRelay}; direto ${e.status ? 'HTTP ' + e.status : 'sem resposta'}`;
+    e.bloqueio = e.bloqueio || ultimoRelayBloqueio;
+    e.rota = `aba da Liga: ${ultimoRelay}; direto ${e.status ? 'HTTP ' + e.status : 'sem resposta'}${rotuloBloqueio(e.bloqueio)}`;
     throw e;
   }
+}
+
+// Fetch recusado nas duas rotas. Se for bloqueio duro do Cloudflare, não há o que fazer.
+// Senão (desafio, ou 403 sem assinatura conhecida), navega a nossa aba até a URL: a navegação
+// real passa o desafio e grava o cf_clearance; aí o relay volta a funcionar. Devolve o HTML
+// ou null. Limitado a uma tentativa a cada DESAFIO_INTERVALO_MS pra não ficar abrindo página.
+async function tentarDesafio(url, bloqueio) {
+  if (bloqueio === 'bloqueio') return null;
+  if (Date.now() - ultimoDesafioAt < DESAFIO_INTERVALO_MS) return null;
+  ultimoDesafioAt = Date.now();
+  const passou = await desafiarNaAba(url);
+  if (!passou) return null;
+  return relayViaLigaTab(url);
+}
+
+// Navega a nossa aba de fundo até `url` e espera a página real carregar. Se o título ficar no
+// desafio ("Um momento..."), traz a aba pra frente: em aba oculta o desafio às vezes não termina,
+// e se pedir clique o lojista vê. true = página real no ar (desafio resolvido ou nem houve).
+async function desafiarNaAba(url) {
+  let tabId;
+  try { tabId = await navegarNossaAba(url); } catch (_) { tabId = null; }
+  if (tabId == null) return false;
+  try {
+    const limite = Date.now() + 40000;
+    let trouxePraFrente = false;
+    while (Date.now() < limite) {
+      const titulo = await tituloDaAba(tabId);
+      if (titulo == null) return false; // aba fechada
+      const tipo = tipoBloqueio(null, titulo);
+      if (tipo === 'bloqueio') { ultimoRelayBloqueio = 'bloqueio'; return false; }
+      if (tipo !== 'desafio' && titulo) return true;
+      if (!trouxePraFrente) { trouxePraFrente = true; await focarAba(tabId); }
+      await sleep(1000);
+    }
+  } catch (_) {
+    nossaAbaId = null;
+  }
+  return false;
+}
+
+async function tituloDaAba(tabId) {
+  try {
+    const [inj] = await chrome.scripting.executeScript({ target: { tabId }, func: () => document.title });
+    return inj && typeof inj.result === 'string' ? inj.result.trim() : '';
+  } catch (_) {
+    return null;
+  }
+}
+
+async function focarAba(tabId) {
+  try {
+    const tab = await chrome.tabs.update(tabId, { active: true });
+    if (tab && tab.windowId != null) await chrome.windows.update(tab.windowId, { focused: true });
+  } catch (_) {}
+}
+
+// Aba de fundo nossa, carregando `url` (cria se não existe; senão navega). Devolve o id.
+async function navegarNossaAba(url) {
+  if (nossaAbaId != null) {
+    try {
+      const t = await chrome.tabs.get(nossaAbaId);
+      if (t && !t.discarded) {
+        await chrome.tabs.update(nossaAbaId, { url });
+        await waitTabComplete(nossaAbaId, 20000);
+        return nossaAbaId;
+      }
+    } catch (_) {}
+    nossaAbaId = null;
+  }
+  const tab = await chrome.tabs.create({ url, active: false });
+  nossaAbaId = tab.id;
+  ligaTabId = tab.id;
+  await waitTabComplete(tab.id, 20000);
+  return nossaAbaId;
 }
 
 // Busca a página DENTRO da aba da Liga via chrome.scripting (mesmo-origem, leva o cookie do
@@ -84,7 +175,11 @@ async function relayViaLigaTab(url) {
             credentials: 'include',
             headers: { 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'pt-BR,pt;q=0.9' },
           });
-          return { ok: r.ok, status: r.status, text: r.ok ? await r.text() : null };
+          const text = await r.text();
+          if (r.ok) return { ok: true, status: r.status, text };
+          // Erro: devolve só a assinatura do Cloudflare (header + título), não a página
+          const m = /<title[^>]*>([^<]*)/i.exec(text || '');
+          return { ok: false, status: r.status, cf: r.headers.get('cf-mitigated'), titulo: m ? m[1].trim() : '' };
         } catch (e) {
           return { ok: false, status: 0, error: String((e && e.message) || e) };
         }
@@ -92,8 +187,11 @@ async function relayViaLigaTab(url) {
       args: [url],
     });
     const res = inj && inj.result;
-    if (res && res.ok && typeof res.text === 'string') { ultimoRelay = 'ok'; return res.text; }
-    ultimoRelay = res ? (res.status ? 'HTTP ' + res.status : res.error || 'sem resposta') : 'sem resposta';
+    if (res && res.ok && typeof res.text === 'string') { ultimoRelay = 'ok'; ultimoRelayBloqueio = null; return res.text; }
+    ultimoRelayBloqueio = res ? tipoBloqueio(res.cf, res.titulo) : null;
+    ultimoRelay = res
+      ? (res.status ? 'HTTP ' + res.status + rotuloBloqueio(ultimoRelayBloqueio) : res.error || 'sem resposta')
+      : 'sem resposta';
   } catch (e) {
     ultimoRelay = 'falhou (' + ((e && e.message) || e) + ')';
     ligaTabId = null; // aba fechada/descartada → recria na próxima
@@ -119,8 +217,9 @@ async function ensureLigaTab() {
   // nossa ponte first-party. Guard para não criar várias em paralelo.
   if (!ligaTabCreating) {
     ligaTabCreating = (async () => {
-      const tab = await chrome.tabs.create({ url: 'https://www.ligamagic.com.br/', active: false });
+      const tab = await chrome.tabs.create({ url: LIGA_HOME, active: false });
       ligaTabId = tab.id;
+      nossaAbaId = tab.id;
       await waitTabComplete(tab.id, 20000);
       return ligaTabId;
     })().finally(() => { ligaTabCreating = null; });
@@ -163,14 +262,16 @@ const HANDLERS = {
   abrirLiga,
 };
 
-// Traz a aba da Liga (a de fundo do relay, se existir) pra frente. O desafio do Cloudflare
-// às vezes não termina numa aba oculta (o navegador desacelera abas em segundo plano); com
-// a aba visível ele passa, e o content script avisa `ligaVisitada`, que tira a pausa.
+// Abre, na nossa aba, a página da carta que falhou por último (não a home: o desafio do
+// Cloudflare pode valer só pras páginas de carta, e a home abrir normal não resolve nada) e
+// traz pra frente. Com a aba visível o desafio termina, o content script avisa `ligaVisitada`
+// e a pausa cai.
 async function abrirLiga() {
-  const tabId = await ensureLigaTab();
+  const url = ultimoErro && ultimoErro.carta ? cardPageUrl(ultimoErro.carta) : LIGA_HOME;
+  let tabId = null;
+  try { tabId = await navegarNossaAba(url); } catch (_) {}
   if (tabId == null) return { ok: false, error: 'não consegui abrir a LigaMagic' };
-  const tab = await chrome.tabs.update(tabId, { active: true });
-  if (tab && tab.windowId != null) await chrome.windows.update(tab.windowId, { focused: true });
+  await focarAba(tabId);
   return { ok: true };
 }
 
@@ -646,7 +747,12 @@ async function fetchWithRetry(cardName, editionCode, collectorNumber) {
   }
   console.warn('[LigaMagic] fetch falhou para', cardName, lastErr?.message, lastErr?.rota || '',
     '— pausando por', PAUSE_MS / 60000, 'min');
-  ultimoErro = { quando: Date.now(), carta: cardName, detalhe: lastErr?.rota || lastErr?.message || 'erro' };
+  ultimoErro = {
+    quando: Date.now(),
+    carta: cardName,
+    detalhe: lastErr?.rota || lastErr?.message || 'erro',
+    bloqueio: lastErr?.bloqueio || ultimoRelayBloqueio || null,
+  };
   await setPaused(Date.now() + PAUSE_MS);
   return { transient: true };
 }

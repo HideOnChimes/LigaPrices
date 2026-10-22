@@ -196,6 +196,14 @@ async function loadLigaStatus() {
     if (s.ultimoErro) {
       const e = s.ultimoErro;
       html += `<div class="approx">Último erro (${hhmm(e.quando)}, ${escapeHtml(e.carta)}): ${escapeHtml(e.detalhe)}</div>`;
+      if (e.bloqueio === 'desafio') {
+        html += `<div>O Cloudflare está pedindo um desafio nas páginas de carta. Clique em <b>Abrir Liga</b>: ` +
+          `a página da carta abre, passe o "Um momento…" e as buscas voltam sozinhas.</div>`;
+      } else if (e.bloqueio === 'bloqueio') {
+        html += `<div>O Cloudflare barrou este IP por enquanto. Espere alguns minutos e clique em <b>Retomar agora</b>.</div>`;
+      } else if (s.pausedUntil) {
+        html += `<div>Clique em <b>Abrir Liga</b>: abre a página da carta que falhou. Se a Liga mostrar um desafio ou erro ali, é isso que está barrando as buscas.</div>`;
+      }
     }
     ligaStatusEl.innerHTML = html;
     const abrirBtn = document.getElementById('abrirLiga');
