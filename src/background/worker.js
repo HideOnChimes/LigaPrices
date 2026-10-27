@@ -410,7 +410,8 @@ async function setFilters({ filtros }) {
 // das listagens que passam no filtro (precosFiltrados).
 // filtros (opcional): filtro só para este pedido, no lugar do gravado no popup. A dashboard usa
 // quando uma regra de preço pede a Liga de outro jeito (ex.: só lojas de MG, só NM).
-async function getEditions({ cardName, filtros }) {
+// force (opcional): ignora o cache (inclusive NOT_FOUND) e busca de novo na Liga.
+async function getEditions({ cardName, filtros, force }) {
   const name = String(cardName || '').trim();
   if (!name) return { ok: false, error: 'Nome da carta vazio' };
   let filters = await readFilters();
@@ -418,7 +419,7 @@ async function getEditions({ cardName, filtros }) {
     const filtro = normalizar(filtros);
     filters = { priceType: filters.priceType, filtro, isFiltering: ativo(filtro) };
   }
-  const loaded = await loadEntry(name, '', '', filters.isFiltering);
+  const loaded = await loadEntry(name, '', '', filters.isFiltering, force === true);
   if (loaded.status !== 'ok') return { ok: false, ...statusError(loaded) };
   return {
     ok: true,
@@ -545,11 +546,12 @@ async function readFilters() {
 // Resolve o cache entry da carta (busca com dedupe/fila no miss).
 // Retorna { status:'ok', entry, ts, fromCache } | { status:'notfound' } | { status:'transient' }
 //       | { status:'paused', until }.
-async function loadEntry(cardName, editionCode, collectorNumber, isFiltering) {
+// force: pula o cache (inclusive NOT_FOUND) e vai pra fila de busca.
+async function loadEntry(cardName, editionCode, collectorNumber, isFiltering, force = false) {
   const key = cacheKey(cardName);
 
   // 1. Cache hit → responde imediato, sem fila
-  const cached = await getCachedEntry(key);
+  const cached = force ? null : await getCachedEntry(key);
   let entry = cached ? cached.data : null;
 
   if (entry === 'NOT_FOUND') return { status: 'notfound' };
