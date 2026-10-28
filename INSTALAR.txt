@@ -6,6 +6,29 @@
 4. Selecione a pasta do projeto (a que tem o manifest.json)
 5. A extensão aparecerá na lista com o ícone da Liga
 
+== SAFARI (MAC) ==
+
+O projeto Xcode fica em safari/ e usa os mesmos arquivos da extensão (não copia nada).
+Precisa do Xcode com um Apple ID em Settings → Accounts (o time pessoal grátis basta,
+o app fica assinado e o Safari não pede "Permitir extensões sem assinatura").
+
+1. Compile:
+     cd "safari/LigaMagic Prices"
+     xcodebuild -scheme "LigaMagic Prices" -configuration Release -derivedDataPath ../build \
+       DEVELOPMENT_TEAM=SEU_TEAM_ID -allowProvisioningUpdates build
+   SEU_TEAM_ID é o ID de 10 caracteres do seu time. Para achar, rode
+     security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+   e pegue o valor de OU= (não o código entre parênteses no nome do certificado).
+2. Copie o app para /Applications, apague a cópia do build e abra o app uma vez:
+     ditto "../build/Build/Products/Release/LigaMagic Prices.app" "/Applications/LigaMagic Prices.app"
+     rm -rf ../build/Build/Products
+     open "/Applications/LigaMagic Prices.app"
+   O Safari não lê apps dentro de ~/git: se a cópia do build ficar, o macOS pode registrar
+   a extensão a partir dela e ela some da lista do Safari.
+3. Safari → Ajustes → Extensões → ative "LigaMagic Prices" e permita os sites
+   (archidekt.com, ligamagic.com.br, dashboard)
+4. Subiu a versão no manifest.json? Atualize também MARKETING_VERSION no project.pbxproj.
+
 == ONDE FUNCIONA ==
 
 - Archidekt: https://archidekt.com/decks/... (preços em R$ ao lado de cada carta + total do deck)
