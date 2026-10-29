@@ -1,7 +1,7 @@
 // Ponte entre a dashboard de estoque (página web) e o service worker da extensão.
 // A página não sabe o id da extensão: conversa por window.postMessage na própria janela.
 //
-//   página  → { ligaPrices: 'req', id, type: 'ping' | 'status' | 'editions', cardName? }
+//   página  → { ligaPrices: 'req', id, type: 'ping' | 'status' | 'editions' | 'setFilters' | 'resume' | 'abrirLiga', cardName? }
 //   ponte   → { ligaPrices: 'res', id, ok, ...resposta do worker }
 //   ponte   → { ligaPrices: 'ready', version }   (ao carregar; a página também pode dar ping)
 //
@@ -29,6 +29,12 @@
         res = await chrome.runtime.sendMessage({ type: 'getEditions', cardName: String(m.cardName || ''), filtros: m.filtros && typeof m.filtros === 'object' ? m.filtros : undefined, force: m.force === true });
       } else if (m.type === 'setFilters') {
         res = await chrome.runtime.sendMessage({ type: 'setFilters', filtros: m.filtros });
+      } else if (m.type === 'resume') {
+        // tira a pausa do disjuntor (link "retomar agora" no aviso de pausa da dashboard)
+        res = await chrome.runtime.sendMessage({ type: 'resume' });
+      } else if (m.type === 'abrirLiga') {
+        // abre a última página que falhou numa aba visível: passa o Cloudflare e a pausa cai sozinha
+        res = await chrome.runtime.sendMessage({ type: 'abrirLiga' });
       } else {
         res = { ok: false, error: 'Tipo de pedido desconhecido: ' + m.type };
       }
