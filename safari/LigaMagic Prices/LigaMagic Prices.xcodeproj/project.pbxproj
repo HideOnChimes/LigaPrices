@@ -1,0 +1,609 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		D0A0EFAC308FAACF001055D8 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A0EFAB308FAACF001055D8 /* AppDelegate.swift */; };
+		D0A0EFB0308FAACF001055D8 /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFAE308FAACF001055D8 /* Main.html */; };
+		D0A0EFB2308FAACF001055D8 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFB1308FAACF001055D8 /* Icon.png */; };
+		D0A0EFB4308FAACF001055D8 /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFB3308FAACF001055D8 /* Style.css */; };
+		D0A0EFB6308FAACF001055D8 /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFB5308FAACF001055D8 /* Script.js */; };
+		D0A0EFB8308FAACF001055D8 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A0EFB7308FAACF001055D8 /* ViewController.swift */; };
+		D0A0EFBB308FAACF001055D8 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFB9308FAACF001055D8 /* Main.storyboard */; };
+		D0A0EFBD308FAAD0001055D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFBC308FAAD0001055D8 /* Assets.xcassets */; };
+		D0A0EFC4308FAAD0001055D8 /* LigaMagic Prices Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D0A0EFC3308FAAD0001055D8 /* LigaMagic Prices Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D0A0EFC9308FAAD0001055D8 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A0EFC8308FAAD0001055D8 /* SafariWebExtensionHandler.swift */; };
+		D0A0EFDE308FAAD0001055D8 /* popup in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFD6308FAAD0001055D8 /* popup */; };
+		D0A0EFE2308FAAD0001055D8 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFDA308FAAD0001055D8 /* manifest.json */; };
+		D0A0EFE3308FAAD0001055D8 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFDB308FAAD0001055D8 /* assets */; };
+		D0A0EFE4308FAAD0001055D8 /* src in Resources */ = {isa = PBXBuildFile; fileRef = D0A0EFDC308FAAD0001055D8 /* src */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D0A0EFC5308FAAD0001055D8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D0A0EFA0308FAACE001055D8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D0A0EFC2308FAAD0001055D8;
+			remoteInfo = "LigaMagic Prices Extension";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D0A0EFD0308FAAD0001055D8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D0A0EFC4308FAAD0001055D8 /* LigaMagic Prices Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		D0A0EFA8308FAACF001055D8 /* LigaMagic Prices.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LigaMagic Prices.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0A0EFAB308FAACF001055D8 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		D0A0EFAF308FAACF001055D8 /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		D0A0EFB1308FAACF001055D8 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		D0A0EFB3308FAACF001055D8 /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		D0A0EFB5308FAACF001055D8 /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		D0A0EFB7308FAACF001055D8 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		D0A0EFBA308FAACF001055D8 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		D0A0EFBC308FAAD0001055D8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D0A0EFBE308FAAD0001055D8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D0A0EFC3308FAAD0001055D8 /* LigaMagic Prices Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "LigaMagic Prices Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D0A0EFC8308FAAD0001055D8 /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		D0A0EFCA308FAAD0001055D8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D0A0EFD6308FAAD0001055D8 /* popup */ = {isa = PBXFileReference; lastKnownFileType = folder; name = popup; path = ../../../popup; sourceTree = "<group>"; };
+		D0A0EFDA308FAAD0001055D8 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../../manifest.json; sourceTree = "<group>"; };
+		D0A0EFDB308FAAD0001055D8 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../../assets; sourceTree = "<group>"; };
+		D0A0EFDC308FAAD0001055D8 /* src */ = {isa = PBXFileReference; lastKnownFileType = folder; name = src; path = ../../../src; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D0A0EFA5308FAACE001055D8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0A0EFC0308FAAD0001055D8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D0A0EF9F308FAACE001055D8 = {
+			isa = PBXGroup;
+			children = (
+				D0A0EFAA308FAACF001055D8 /* LigaMagic Prices */,
+				D0A0EFC7308FAAD0001055D8 /* LigaMagic Prices Extension */,
+				D0A0EFA9308FAACF001055D8 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D0A0EFA9308FAACF001055D8 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D0A0EFA8308FAACF001055D8 /* LigaMagic Prices.app */,
+				D0A0EFC3308FAAD0001055D8 /* LigaMagic Prices Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D0A0EFAA308FAACF001055D8 /* LigaMagic Prices */ = {
+			isa = PBXGroup;
+			children = (
+				D0A0EFAB308FAACF001055D8 /* AppDelegate.swift */,
+				D0A0EFB7308FAACF001055D8 /* ViewController.swift */,
+				D0A0EFB9308FAACF001055D8 /* Main.storyboard */,
+				D0A0EFBC308FAAD0001055D8 /* Assets.xcassets */,
+				D0A0EFBE308FAAD0001055D8 /* Info.plist */,
+				D0A0EFAD308FAACF001055D8 /* Resources */,
+			);
+			path = "LigaMagic Prices";
+			sourceTree = "<group>";
+		};
+		D0A0EFAD308FAACF001055D8 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D0A0EFAE308FAACF001055D8 /* Main.html */,
+				D0A0EFB1308FAACF001055D8 /* Icon.png */,
+				D0A0EFB3308FAACF001055D8 /* Style.css */,
+				D0A0EFB5308FAACF001055D8 /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		D0A0EFC7308FAAD0001055D8 /* LigaMagic Prices Extension */ = {
+			isa = PBXGroup;
+			children = (
+				D0A0EFD4308FAAD0001055D8 /* Resources */,
+				D0A0EFC8308FAAD0001055D8 /* SafariWebExtensionHandler.swift */,
+				D0A0EFCA308FAAD0001055D8 /* Info.plist */,
+			);
+			path = "LigaMagic Prices Extension";
+			sourceTree = "<group>";
+		};
+		D0A0EFD4308FAAD0001055D8 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D0A0EFD6308FAAD0001055D8 /* popup */,
+				D0A0EFDA308FAAD0001055D8 /* manifest.json */,
+				D0A0EFDB308FAAD0001055D8 /* assets */,
+				D0A0EFDC308FAAD0001055D8 /* src */,
+			);
+			name = Resources;
+			path = "LigaMagic Prices Extension";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		D0A0EFA7308FAACE001055D8 /* LigaMagic Prices */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D0A0EFD1308FAAD0001055D8 /* Build configuration list for PBXNativeTarget "LigaMagic Prices" */;
+			buildPhases = (
+				D0A0EFA4308FAACE001055D8 /* Sources */,
+				D0A0EFA5308FAACE001055D8 /* Frameworks */,
+				D0A0EFA6308FAACE001055D8 /* Resources */,
+				D0A0EFD0308FAAD0001055D8 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D0A0EFC6308FAAD0001055D8 /* PBXTargetDependency */,
+			);
+			name = "LigaMagic Prices";
+			packageProductDependencies = (
+			);
+			productName = "LigaMagic Prices";
+			productReference = D0A0EFA8308FAACF001055D8 /* LigaMagic Prices.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D0A0EFC2308FAAD0001055D8 /* LigaMagic Prices Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D0A0EFCD308FAAD0001055D8 /* Build configuration list for PBXNativeTarget "LigaMagic Prices Extension" */;
+			buildPhases = (
+				D0A0EFBF308FAAD0001055D8 /* Sources */,
+				D0A0EFC0308FAAD0001055D8 /* Frameworks */,
+				D0A0EFC1308FAAD0001055D8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "LigaMagic Prices Extension";
+			packageProductDependencies = (
+			);
+			productName = "LigaMagic Prices Extension";
+			productReference = D0A0EFC3308FAAD0001055D8 /* LigaMagic Prices Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D0A0EFA0308FAACE001055D8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					D0A0EFA7308FAACE001055D8 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					D0A0EFC2308FAAD0001055D8 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = D0A0EFA3308FAACE001055D8 /* Build configuration list for PBXProject "LigaMagic Prices" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = D0A0EF9F308FAACE001055D8;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = D0A0EFA9308FAACF001055D8 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				D0A0EFA7308FAACE001055D8 /* LigaMagic Prices */,
+				D0A0EFC2308FAAD0001055D8 /* LigaMagic Prices Extension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D0A0EFA6308FAACE001055D8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0A0EFB2308FAACF001055D8 /* Icon.png in Resources */,
+				D0A0EFBB308FAACF001055D8 /* Main.storyboard in Resources */,
+				D0A0EFB6308FAACF001055D8 /* Script.js in Resources */,
+				D0A0EFB0308FAACF001055D8 /* Main.html in Resources */,
+				D0A0EFBD308FAAD0001055D8 /* Assets.xcassets in Resources */,
+				D0A0EFB4308FAACF001055D8 /* Style.css in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0A0EFC1308FAAD0001055D8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0A0EFE3308FAAD0001055D8 /* assets in Resources */,
+				D0A0EFE4308FAAD0001055D8 /* src in Resources */,
+				D0A0EFE2308FAAD0001055D8 /* manifest.json in Resources */,
+				D0A0EFDE308FAAD0001055D8 /* popup in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D0A0EFA4308FAACE001055D8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0A0EFB8308FAACF001055D8 /* ViewController.swift in Sources */,
+				D0A0EFAC308FAACF001055D8 /* AppDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0A0EFBF308FAAD0001055D8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0A0EFC9308FAAD0001055D8 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D0A0EFC6308FAAD0001055D8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D0A0EFC2308FAAD0001055D8 /* LigaMagic Prices Extension */;
+			targetProxy = D0A0EFC5308FAAD0001055D8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		D0A0EFAE308FAACF001055D8 /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D0A0EFAF308FAACF001055D8 /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		D0A0EFB9308FAACF001055D8 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				D0A0EFBA308FAACF001055D8 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		D0A0EFCB308FAAD0001055D8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		D0A0EFCC308FAAD0001055D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		D0A0EFCE308FAAD0001055D8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LigaMagic Prices Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "LigaMagic Prices Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.14.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = br.com.uupedrin.ligaprices.Extension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D0A0EFCF308FAAD0001055D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LigaMagic Prices Extension/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "LigaMagic Prices Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 10.14;
+				MARKETING_VERSION = 1.14.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = br.com.uupedrin.ligaprices.Extension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D0A0EFD2308FAAD0001055D8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LigaMagic Prices/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "LigaMagic Prices";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.14.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = br.com.uupedrin.ligaprices;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D0A0EFD3308FAAD0001055D8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "LigaMagic Prices/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "LigaMagic Prices";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.14.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = br.com.uupedrin.ligaprices;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		D0A0EFA3308FAACE001055D8 /* Build configuration list for PBXProject "LigaMagic Prices" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0A0EFCB308FAAD0001055D8 /* Debug */,
+				D0A0EFCC308FAAD0001055D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D0A0EFCD308FAAD0001055D8 /* Build configuration list for PBXNativeTarget "LigaMagic Prices Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0A0EFCE308FAAD0001055D8 /* Debug */,
+				D0A0EFCF308FAAD0001055D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D0A0EFD1308FAAD0001055D8 /* Build configuration list for PBXNativeTarget "LigaMagic Prices" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0A0EFD2308FAAD0001055D8 /* Debug */,
+				D0A0EFD3308FAAD0001055D8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D0A0EFA0308FAACE001055D8 /* Project object */;
+}
